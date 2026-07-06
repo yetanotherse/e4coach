@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# env
+.env
+.env.*
+!.env.example
+
+# prisma
+packages/db/generated/
+
+# misc
+.DS_Store
+*.log
+.vercel
+.idea/
+.vscode/
+playwright-report/
+test-results/

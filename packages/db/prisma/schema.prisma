@@ -1,0 +1,83 @@
+// Prisma schema — spec §10. Postgres on Supabase.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  emailHash    String?       // hashed email for analytics distinctId (spec §15)
+  lichessUser  String?
+  chessComUser String?
+  consentAt    DateTime? // when the user accepted the privacy policy
+  createdAt    DateTime      @default(now())
+  lastSeenAt   DateTime      @default(now())
+  analysisJobs AnalysisJob[]
+  reports      Report[]
+  interests    Interest[]
+}
+
+model AnalysisJob {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source     String // 'lichess' | 'chesscom'
+  status     JobStatus @default(PENDING)
+  stage      String? // fine-grained progress for the UI
+  gameCount  Int       @default(0)
+  engineMeta Json? // { kind, version, depth/movetime }
+  error      String?
+  // idempotency / resumability: which pipeline stage outputs are persisted
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  report     Report?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  userId     String
+  jobId      String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job        AnalysisJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  publicSlug String   @unique // long random unguessable token (spec §11.2)
+  profile    Json // structured WeaknessProfile (source of truth)
+  content    Json // rendered ReportContent (LLM prose + example refs)
+  degraded   Boolean  @default(false) // produced by template fallback?
+  createdAt  DateTime @default(now())
+  viewCount  Int      @default(0)
+
+  @@index([userId])
+}
+
+// Fake-door willingness-to-pay signal (spec §13 POST /api/interest, §15)
+model Interest {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tier      String
+  createdAt DateTime @default(now())
+
+  @@index([tier])
+}
+
+enum JobStatus {
+  PENDING
+  FETCHING
+  EVALUATING
+  CLASSIFYING
+  GENERATING
+  DONE
+  FAILED
+}
