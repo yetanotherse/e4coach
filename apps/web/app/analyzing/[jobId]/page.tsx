@@ -1,0 +1,79 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+const STAGE_LABEL: Record<string, string> = {
+  PENDING: 'Queued…',
+  FETCHING: 'Importing your recent games…',
+  EVALUATING: 'Reviewing every move with the engine…',
+  CLASSIFYING: 'Finding your weakness patterns…',
+  GENERATING: 'Writing your report…',
+  DONE: 'Done!',
+  FAILED: 'Something went wrong.',
+};
+
+export default function AnalyzingPage({ params }: { params: { jobId: string } }) {
+  const router = useRouter();
+  const [status, setStatus] = useState('PENDING');
+  const [stage, setStage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/job/${params.jobId}`);
+        const json = await res.json();
+        if (!active) return;
+        if (!json.ok) {
+          setError('We lost track of this analysis. Please try again.');
+          return;
+        }
+        setStatus(json.data.status);
+        setStage(json.data.stage);
+        if (json.data.status === 'DONE' && json.data.reportSlug) {
+          router.push(`/report/${json.data.reportSlug}`);
+          return;
+        }
+        if (json.data.status === 'FAILED') {
+          setError(json.data.error ?? 'Analysis failed. Please try again.');
+          return;
+        }
+        timer = setTimeout(poll, 2000);
+      } catch {
+        if (active) timer = setTimeout(poll, 3000);
+      }
+    };
+    let timer: ReturnType<typeof setTimeout>;
+    poll();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [params.jobId, router]);
+
+  return (
+    <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-6 text-center">
+      {!error ? (
+        <>
+          <div className="mb-6 h-12 w-12 animate-spin rounded-full border-4 border-neutral-200 border-t-brand" />
+          <h1 className="text-2xl font-semibold">Analyzing your games</h1>
+          <p className="mt-2 text-neutral-600">{stage ?? STAGE_LABEL[status] ?? 'Working…'}</p>
+          <p className="mt-8 text-xs text-neutral-400">
+            This usually takes a couple of minutes. You can safely leave — we&apos;ll email your
+            report when it&apos;s ready.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className="text-2xl font-semibold text-red-600">We hit a snag</h1>
+          <p className="mt-2 text-neutral-600">{error}</p>
+          <a href="/" className="mt-6 rounded-lg bg-brand px-4 py-2 font-medium text-white">
+            Try again
+          </a>
+        </>
+      )}
+    </main>
+  );
+}
