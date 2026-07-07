@@ -5,6 +5,7 @@
  *   STOCKFISH_PATH=/opt/homebrew/bin/stockfish \
  *   pnpm --filter @chess-coach/worker exec tsx src/smoke.ts <lichessUser> [maxGames]
  */
+import './loadEnv.js';
 import {
   aggregateProfile,
   parseGame,

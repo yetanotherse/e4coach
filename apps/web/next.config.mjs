@@ -1,3 +1,12 @@
+import { config as loadDotenv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+// Load the repo-root .env so web + worker share one env file. App-local
+// .env.local (loaded by Next itself) still wins over these.
+const here = dirname(fileURLToPath(import.meta.url));
+loadDotenv({ path: resolve(here, '../../.env') });
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

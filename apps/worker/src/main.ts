@@ -2,6 +2,7 @@
  * Worker entrypoint. Loads config, wires adapters (mock by default), and runs
  * the job poll loop until SIGINT/SIGTERM.
  */
+import './loadEnv.js'; // must run before config is read
 import { loadEnv } from '@chess-coach/config';
 import {
   createAnalytics,

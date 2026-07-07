@@ -75,6 +75,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.5.2(postcss@8.5.16)
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
       postcss:
         specifier: ^8.4.49
         version: 8.5.16
@@ -103,6 +106,9 @@ importers:
       '@types/node':
         specifier: ^22.10.5
         version: 22.20.0
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
       tsx:
         specifier: ^4.19.2
         version: 4.23.0

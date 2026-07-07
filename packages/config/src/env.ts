@@ -9,9 +9,10 @@ const boolish = z
   .transform((v) => v === 'true' || v === '1');
 
 const EnvSchema = z.object({
-  // Database
-  DATABASE_URL: z.string().url(),
-  DIRECT_URL: z.string().url().optional(),
+  // Database — Postgres connection strings aren't always strict WHATWG URLs
+  // (encoded passwords etc.); Prisma validates the real shape.
+  DATABASE_URL: z.string().min(1).startsWith('postgres'),
+  DIRECT_URL: z.string().min(1).startsWith('postgres').optional(),
 
   // App
   APP_URL: z.string().url().default('http://localhost:3000'),
