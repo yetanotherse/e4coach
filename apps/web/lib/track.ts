@@ -15,8 +15,17 @@ export type ClientEvent =
   | 'interest_clicked';
 
 export function track(event: ClientEvent, props?: Record<string, unknown>): void {
-  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
-    console.debug('[track]', event, props ?? {});
+  if (typeof window === 'undefined') return;
+  // Fire-and-forget to the server, which forwards to PostHog with the key kept
+  // server-side. keepalive lets it survive a navigation (e.g. cta_click).
+  try {
+    void fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, props }),
+      keepalive: true,
+    });
+  } catch {
+    /* never let analytics break the UI */
   }
-  // Phase D: window.posthog?.capture(event, props)
 }

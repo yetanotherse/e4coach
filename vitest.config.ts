@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['packages/**/*.{test,spec}.ts', 'apps/worker/**/*.{test,spec}.ts'],
+    include: [
+      'packages/**/*.{test,spec}.ts',
+      'apps/worker/**/*.{test,spec}.ts',
+      'apps/web/**/*.{test,spec}.ts',
+    ],
     coverage: {
       provider: 'v8',
       include: ['packages/core/src/**'],

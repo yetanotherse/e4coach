@@ -38,6 +38,18 @@ keys. Real adapters (Lichess/Stockfish/Gemini) are swapped in via env in Phase C
 ## Build phases
 
 - **A — Foundation** ✅ monorepo, config, db schema, adapter ports + mocks
-- **B — Vertical slice on mocks** core weakness engine → worker pipeline → web funnel
-- **C — Real adapters** Lichess, native Stockfish, Gemini Flash
-- **D — Auth/email/analytics/deploy** magic-link, Resend, PostHog, Playwright e2e
+- **B — Vertical slice on mocks** ✅ core weakness engine → worker pipeline → web funnel
+- **C — Real adapters** ✅ Lichess, native Stockfish, Gemini Flash
+- **D — Auth/email/analytics/deploy** ✅ magic-link, Resend, PostHog, Playwright e2e, Docker/Render
+
+## Deployment
+
+See [DEPLOY.md](DEPLOY.md). Web → Vercel, worker → Render/Fly (Docker + native Stockfish),
+Postgres → Supabase. Ubuntu Stockfish: `sudo apt-get install -y stockfish` (`/usr/games/stockfish`).
+
+## Real end-to-end check (live Lichess + Stockfish, no DB)
+
+```bash
+STOCKFISH_PATH=/path/to/stockfish \
+  pnpm --filter @chess-coach/worker exec tsx src/smoke.ts <lichessUsername> 3
+```

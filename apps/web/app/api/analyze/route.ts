@@ -1,29 +1,34 @@
-import { AnalyzeSchema } from '@/lib/validation';
 import { analytics, env, jsonError, jsonOk, prisma } from '@/lib/server';
+import { getSessionUserId } from '@/lib/auth';
 
 /**
- * POST /api/analyze — start a fresh AnalysisJob for an existing user
- * ("analyze new games", spec §13). Auth is added in Phase D; for now the user
- * is identified by id.
+ * POST /api/analyze — start a fresh AnalysisJob for the signed-in user
+ * ("analyze new games", spec §13). The user is taken from the session, never
+ * from the request body.
  */
-export async function POST(req: Request): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return jsonError('Invalid JSON body', 400);
-  }
-  const parsed = AnalyzeSchema.safeParse(body);
-  if (!parsed.success) return jsonError('Invalid input', 422);
+export async function POST(): Promise<Response> {
+  const userId = getSessionUserId();
+  if (!userId) return jsonError('Not signed in', 401);
 
-  const user = await prisma.user.findUnique({ where: { id: parsed.data.userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return jsonError('User not found', 404);
 
-  const job = await prisma.analysisJob.create({
-    data: { userId: user.id, source: env.GAME_SOURCE, status: 'PENDING' },
+  // Don't stack duplicate active jobs.
+  const active = await prisma.analysisJob.findFirst({
+    where: {
+      userId: user.id,
+      status: { in: ['PENDING', 'FETCHING', 'EVALUATING', 'CLASSIFYING', 'GENERATING'] },
+    },
   });
-  await analytics.capture(user.emailHash ?? user.id, 'reanalyze_clicked', { jobId: job.id });
-  await analytics.capture(user.emailHash ?? user.id, 'job_started', { jobId: job.id });
+  const job =
+    active ??
+    (await prisma.analysisJob.create({
+      data: { userId: user.id, source: env.GAME_SOURCE, status: 'PENDING' },
+    }));
 
+  if (!active) {
+    await analytics.capture(user.emailHash ?? user.id, 'reanalyze_clicked', { jobId: job.id });
+    await analytics.capture(user.emailHash ?? user.id, 'job_started', { jobId: job.id });
+  }
   return jsonOk({ jobId: job.id }, 201);
 }

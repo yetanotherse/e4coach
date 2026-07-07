@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.next
+**/coverage
+**/.turbo
+packages/db/generated
+.git
+e2e
+apps/web
+*.log

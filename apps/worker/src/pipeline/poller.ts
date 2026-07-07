@@ -26,7 +26,12 @@ export async function processNextJob(deps: RunDeps): Promise<boolean> {
   try {
     await runJob(
       { id: job.id, userId: job.userId, source: job.source },
-      { id: user.id, emailHash: user.emailHash, lichessUser: user.lichessUser },
+      {
+        id: user.id,
+        email: user.email,
+        emailHash: user.emailHash,
+        lichessUser: user.lichessUser,
+      },
       deps,
     );
   } catch (err) {

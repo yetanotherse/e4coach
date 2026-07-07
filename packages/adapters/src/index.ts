@@ -4,6 +4,8 @@ export * from './factory.js';
 export { LichessGameSource, type LichessOptions } from './lichess/lichessGameSource.js';
 export { StockfishNativeEngine, type StockfishNativeOptions } from './stockfish/nativeEngine.js';
 export { GeminiFlashProvider, type GeminiOptions } from './llm/geminiProvider.js';
+export { PostHogAnalytics, type PostHogOptions } from './analytics/posthogAnalytics.js';
+export { ResendMailer, type ResendOptions } from './email/resendMailer.js';
 
 // Mocks (exported for tests + the Phase B vertical slice)
 export { MockGameSource } from './mocks/mockGameSource.js';

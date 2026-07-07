@@ -1,0 +1,50 @@
+# Render blueprint for the analysis worker (spec §5.1, D1). The Next.js web app
+# deploys separately on Vercel. Set secret env vars in the Render dashboard.
+services:
+  - type: worker
+    name: chess-coach-worker
+    runtime: docker
+    dockerfilePath: ./apps/worker/Dockerfile
+    dockerContext: .
+    plan: starter # always-on; bump for more engine concurrency
+    autoDeploy: true
+    envVars:
+      - key: ENGINE_KIND
+        value: native
+      - key: STOCKFISH_PATH
+        value: /usr/games/stockfish
+      - key: GAME_SOURCE
+        value: lichess
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: LLM_MODEL
+        value: gemini-2.0-flash
+      - key: ANALYTICS_PROVIDER
+        value: posthog
+      - key: MAILER_PROVIDER
+        value: resend
+      - key: MAX_GAMES_PER_JOB
+        value: "20"
+      - key: ENGINE_MOVETIME_MS
+        value: "150"
+      - key: WORKER_POLL_INTERVAL_MS
+        value: "2000"
+      # Secrets — set these in the dashboard (sync:false keeps them out of git):
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: POSTHOG_KEY
+        sync: false
+      - key: POSTHOG_HOST
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: LICHESS_USER_AGENT
+        sync: false
+      - key: APP_URL
+        sync: false

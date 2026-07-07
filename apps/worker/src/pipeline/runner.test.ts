@@ -4,6 +4,7 @@ import {
   MockEngine,
   MockLlmProvider,
   MockAnalytics,
+  MockMailer,
   MOCK_GAMES,
 } from '@chess-coach/adapters';
 import type { PrismaClient } from '@chess-coach/db';
@@ -43,13 +44,15 @@ function makeDeps(db: PrismaClient, over: Partial<RunDeps> = {}): RunDeps {
     engine: new MockEngine(),
     llm: new MockLlmProvider(),
     analytics: new MockAnalytics(),
+    mailer: new MockMailer(),
+    appUrl: 'http://localhost:3000',
     maxGames: 20,
     movetimeMs: 150,
     ...over,
   };
 }
 
-const user = { id: 'u1', emailHash: 'hash1', lichessUser: 'mockuser' };
+const user = { id: 'u1', email: 'u1@example.com', emailHash: 'hash1', lichessUser: 'mockuser' };
 const job = { id: 'j1', userId: 'u1', source: 'mock' };
 
 describe('runJob (full pipeline on mocks)', () => {

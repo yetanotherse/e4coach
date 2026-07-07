@@ -8,6 +8,7 @@ import {
   createEngine,
   createGameSource,
   createLlmProvider,
+  createMailer,
 } from '@chess-coach/adapters';
 import { runPollLoop } from './pipeline/poller.js';
 
@@ -20,6 +21,8 @@ async function main(): Promise<void> {
     engine: createEngine(env),
     llm: createLlmProvider(env),
     analytics: createAnalytics(env),
+    mailer: createMailer(env),
+    appUrl: env.APP_URL,
     maxGames: env.MAX_GAMES_PER_JOB,
     movetimeMs: env.ENGINE_MOVETIME_MS,
   };

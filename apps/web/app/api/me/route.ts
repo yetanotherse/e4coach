@@ -1,26 +1,19 @@
 import { jsonError, jsonOk, prisma } from '@/lib/server';
-import { z } from 'zod';
-
-const DeleteSchema = z.object({ userId: z.string().min(1) });
+import { clearSession, getSessionUserId } from '@/lib/auth';
 
 /**
- * DELETE /api/me — delete the user and cascade all their data (spec §11.3).
- * Auth is added in Phase D; for now the user is identified by id in the body.
+ * DELETE /api/me — delete the signed-in user and cascade all their data
+ * (spec §11.3). The user is taken from the session.
  */
-export async function DELETE(req: Request): Promise<Response> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return jsonError('Invalid JSON body', 400);
-  }
-  const parsed = DeleteSchema.safeParse(body);
-  if (!parsed.success) return jsonError('Invalid input', 422);
+export async function DELETE(): Promise<Response> {
+  const userId = getSessionUserId();
+  if (!userId) return jsonError('Not signed in', 401);
 
   try {
-    await prisma.user.delete({ where: { id: parsed.data.userId } });
+    await prisma.user.delete({ where: { id: userId } });
   } catch {
     return jsonError('User not found', 404);
   }
+  clearSession();
   return jsonOk({ deleted: true });
 }

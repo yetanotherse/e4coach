@@ -11,22 +11,24 @@ export const dynamic = 'force-dynamic';
 async function loadReport(slug: string) {
   const report = await prisma.report.findUnique({ where: { publicSlug: slug } });
   if (!report) return null;
+  const isReturn = report.viewCount > 0; // seen before this load
   await prisma.report.update({
     where: { publicSlug: slug },
     data: { viewCount: { increment: 1 } },
   });
-  return report;
+  return { report, isReturn };
 }
 
 export default async function ReportPage({ params }: { params: { slug: string } }) {
-  const report = await loadReport(params.slug);
-  if (!report) notFound();
+  const loaded = await loadReport(params.slug);
+  if (!loaded) notFound();
+  const { report, isReturn } = loaded;
 
   const content = report.content as unknown as ReportContent;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
-      <PageView event="report_viewed" props={{ slug: params.slug }} />
+      <PageView event="report_viewed" props={{ slug: params.slug, is_return: isReturn }} />
 
       <header className="flex items-start justify-between gap-4">
         <div>

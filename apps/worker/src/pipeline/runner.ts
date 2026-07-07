@@ -15,12 +15,14 @@ import {
   type GameSource,
   type ImportedGame,
   type LlmProvider,
+  type Mailer,
   type WeaknessProfile,
 } from '@chess-coach/core';
 import { prisma, Prisma, type PrismaClient } from '@chess-coach/db';
 import { evaluateGame } from './evaluate.js';
 import { generateReport } from './generate.js';
 import { generateSlug } from './slug.js';
+import { sendReportReadyEmail } from './notify.js';
 
 export interface RunDeps {
   db?: PrismaClient;
@@ -28,6 +30,8 @@ export interface RunDeps {
   engine: ChessEngine;
   llm: LlmProvider;
   analytics: Analytics;
+  mailer: Mailer;
+  appUrl: string;
   maxGames: number;
   movetimeMs: number;
 }
@@ -40,6 +44,7 @@ export interface JobRecord {
 
 export interface UserRecord {
   id: string;
+  email: string;
   emailHash: string | null;
   lichessUser: string | null;
 }
@@ -104,6 +109,13 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       movesScored,
       skipped,
     });
+
+    // Notify the user their report is ready. Email failure must not fail the job.
+    try {
+      await sendReportReadyEmail(deps.mailer, user.email, `${deps.appUrl}/report/${slug}`);
+    } catch (err) {
+      console.warn('[runner] report-ready email failed:', err instanceof Error ? err.message : err);
+    }
     return slug;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

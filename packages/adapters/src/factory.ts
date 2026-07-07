@@ -16,6 +16,8 @@ import { MockMailer } from './mocks/mockMailer.js';
 import { LichessGameSource } from './lichess/lichessGameSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
+import { PostHogAnalytics } from './analytics/posthogAnalytics.js';
+import { ResendMailer } from './email/resendMailer.js';
 
 export function createGameSource(env: Env): GameSource {
   switch (env.GAME_SOURCE) {
@@ -53,7 +55,8 @@ export function createAnalytics(env: Env): Analytics {
     case 'mock':
       return new MockAnalytics();
     case 'posthog':
-      throw new Error('PostHogAnalytics not yet implemented (Phase D)');
+      if (!env.POSTHOG_KEY) throw new Error('POSTHOG_KEY is required for posthog analytics');
+      return new PostHogAnalytics({ apiKey: env.POSTHOG_KEY, host: env.POSTHOG_HOST });
   }
 }
 
@@ -62,6 +65,7 @@ export function createMailer(env: Env): Mailer {
     case 'mock':
       return new MockMailer();
     case 'resend':
-      throw new Error('ResendMailer not yet implemented (Phase D)');
+      if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is required for resend mailer');
+      return new ResendMailer({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM });
   }
 }
