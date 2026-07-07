@@ -20,7 +20,7 @@ const EnvSchema = z.object({
 
   // LLM
   LLM_PROVIDER: z.enum(['mock', 'gemini']).default('mock'),
-  LLM_MODEL: z.string().default('gemini-2.0-flash'),
+  LLM_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_API_KEY: z.string().optional(),
 
   // Engine
@@ -31,7 +31,8 @@ const EnvSchema = z.object({
   // Game source
   GAME_SOURCE: z.enum(['mock', 'lichess']).default('mock'),
   LICHESS_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),
-  MAX_GAMES_PER_JOB: z.coerce.number().int().positive().max(100).default(20),
+  MAX_GAMES_PER_JOB: z.coerce.number().int().positive().max(100).default(30),
+  MAX_EXAMPLES_PER_WEAKNESS: z.coerce.number().int().positive().max(20).default(10),
 
   // Analytics / email / monitoring
   ANALYTICS_PROVIDER: z.enum(['mock', 'posthog']).default('mock'),

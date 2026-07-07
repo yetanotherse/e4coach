@@ -1,10 +1,25 @@
 import { notFound } from 'next/navigation';
-import type { ReportContent } from '@chess-coach/core';
+import type { ReportContent, WeaknessProfile } from '@chess-coach/core';
 import { prisma } from '@/lib/server';
-import { ChessBoard } from '@/components/ChessBoard';
+import { MoveExample } from '@/components/MoveExample';
 import { ShareBar } from '@/components/ShareBar';
 import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
+
+function scopeLine(scope: WeaknessProfile['scope']): string | null {
+  if (!scope) return null;
+  const perf = scope.perfTypes.join(', ');
+  const dates =
+    scope.dateFrom && scope.dateTo
+      ? ` played ${fmt(scope.dateFrom)}–${fmt(scope.dateTo)}`
+      : '';
+  const skipped = scope.skipped > 0 ? ` ${scope.skipped} were skipped (non-standard or unreadable).` : '';
+  return `Analyzed your ${scope.gamesAnalyzed} most recent rated games (${perf})${dates}.${skipped}`;
+}
+
+function fmt(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +40,8 @@ export default async function ReportPage({ params }: { params: { slug: string } 
   const { report, isReturn } = loaded;
 
   const content = report.content as unknown as ReportContent;
+  const profile = report.profile as unknown as WeaknessProfile;
+  const scope = scopeLine(profile.scope);
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -34,6 +51,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
         <div>
           <h1 className="text-3xl font-bold">{content.headline}</h1>
           <p className="mt-2 text-neutral-600">{content.intro}</p>
+          {scope && <p className="mt-2 text-sm text-neutral-500">{scope}</p>}
         </div>
         <ShareBar />
       </header>
@@ -66,19 +84,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
             {w.examples.length > 0 && (
               <div className="mt-5 grid gap-6 sm:grid-cols-2">
                 {w.examples.map((ex) => (
-                  <figure key={`${ex.gameId}-${ex.ply}`} className="rounded-lg border border-neutral-200 p-3">
-                    <div className="mx-auto max-w-[240px]">
-                      <ChessBoard fen={ex.fen} bestMove={ex.betterMove} />
-                    </div>
-                    <figcaption className="mt-2 text-sm text-neutral-600">
-                      Move {ex.moveNumber}: you played <strong>{ex.playedMove}</strong>.{' '}
-                      {ex.gameUrl ? (
-                        <a href={ex.gameUrl} target="_blank" rel="noopener noreferrer" className="text-brand underline">
-                          View game
-                        </a>
-                      ) : null}
-                    </figcaption>
-                  </figure>
+                  <MoveExample key={`${ex.gameId}-${ex.ply}`} ex={ex} />
                 ))}
               </div>
             )}

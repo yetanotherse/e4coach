@@ -21,9 +21,8 @@ export const positionalDriftDetector: Detector = {
     if (hasBigError || inaccuracies.length < MIN_INACCURACIES) return [];
     const worst = inaccuracies.reduce((a, b) => (b.cpl > a.cpl ? b : a));
     return [
-      toErrorInstance(
-        'POSITIONAL_DRIFT',
-        ctx.game,
+      toErrorInstance('POSITIONAL_DRIFT',
+            ctx,
         worst,
         `${inaccuracies.length} small inaccuracies added up with no single blunder.`,
       ),

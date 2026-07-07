@@ -4,24 +4,39 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { track } from '@/lib/track';
 
+const PERF_OPTIONS = ['bullet', 'blitz', 'rapid', 'classical'] as const;
+const GAME_COUNT_OPTIONS = [20, 30, 40, 60];
+
 export function SignupForm() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [lichessUser, setLichessUser] = useState('');
   const [consent, setConsent] = useState(false);
+  const [maxGames, setMaxGames] = useState(30);
+  const [perfTypes, setPerfTypes] = useState<string[]>(['blitz', 'rapid', 'classical']);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function togglePerf(perf: string) {
+    setPerfTypes((cur) =>
+      cur.includes(perf) ? cur.filter((p) => p !== perf) : [...cur, perf],
+    );
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (perfTypes.length === 0) {
+      setError('Pick at least one time control.');
+      return;
+    }
     setSubmitting(true);
     track('signup_submitted');
     try {
       const res = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, lichessUser, consent }),
+        body: JSON.stringify({ email, lichessUser, consent, maxGames, perfTypes }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
@@ -64,6 +79,40 @@ export function SignupForm() {
           required
           className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
         />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="maxGames" className="block text-sm font-medium text-neutral-700">
+            Games to analyze
+          </label>
+          <select
+            id="maxGames"
+            value={maxGames}
+            onChange={(e) => setMaxGames(Number(e.target.value))}
+            className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-brand focus:outline-none"
+          >
+            {GAME_COUNT_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n} most recent
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <span className="block text-sm font-medium text-neutral-700">Time controls</span>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+            {PERF_OPTIONS.map((perf) => (
+              <label key={perf} className="flex items-center gap-1 text-sm text-neutral-600">
+                <input
+                  type="checkbox"
+                  checked={perfTypes.includes(perf)}
+                  onChange={() => togglePerf(perf)}
+                />
+                {perf}
+              </label>
+            ))}
+          </div>
+        </div>
       </div>
       <label className="flex items-start gap-2 text-sm text-neutral-600">
         <input

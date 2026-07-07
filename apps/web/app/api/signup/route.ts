@@ -19,9 +19,13 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.success) {
     return jsonError(parsed.error.issues[0]?.message ?? 'Invalid input', 422);
   }
-  const { email, lichessUser } = parsed.data;
+  const { email, lichessUser, maxGames, perfTypes } = parsed.data;
   const emailHash = hashEmail(email);
   const source = env.GAME_SOURCE;
+  const params =
+    maxGames || perfTypes
+      ? { ...(maxGames ? { maxGames } : {}), ...(perfTypes ? { perfTypes } : {}) }
+      : undefined;
 
   const user = await prisma.user.upsert({
     where: { email },
@@ -36,7 +40,9 @@ export async function POST(req: Request): Promise<Response> {
   });
   const job =
     active ??
-    (await prisma.analysisJob.create({ data: { userId: user.id, source, status: 'PENDING' } }));
+    (await prisma.analysisJob.create({
+      data: { userId: user.id, source, status: 'PENDING', ...(params ? { params } : {}) },
+    }));
 
   await analytics.capture(emailHash, 'signup_completed', { source });
   if (!active) await analytics.capture(emailHash, 'job_started', { jobId: job.id, source });

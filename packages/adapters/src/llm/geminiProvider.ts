@@ -4,7 +4,7 @@ import type {
   LlmGenerateOptions,
   LlmResult,
 } from '@chess-coach/core';
-import { withResilience, type ResilienceOptions } from './resilience.js';
+import { withResilience, type ResilienceOptions, type StatusError } from './resilience.js';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -68,7 +68,9 @@ export class GeminiFlashProvider implements LlmProvider {
         });
         if (!res.ok) {
           const detail = await res.text().catch(() => '');
-          throw new Error(`Gemini ${res.status}: ${detail.slice(0, 300)}`);
+          const err: StatusError = new Error(`Gemini ${res.status}: ${detail.slice(0, 300)}`);
+          err.status = res.status;
+          throw err;
         }
         const json = (await res.json()) as GeminiResponse;
         const text =

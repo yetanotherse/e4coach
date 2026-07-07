@@ -13,13 +13,13 @@ export const endgameTechniqueDetector: Detector = {
     const out: ErrorInstance[] = [];
     for (const move of ctx.moves) {
       if (
+        !move.decided &&
         move.phase === 'endgame' &&
         (move.severity === 'blunder' || move.severity === 'mistake')
       ) {
         out.push(
-          toErrorInstance(
-            'ENDGAME_TECHNIQUE',
-            ctx.game,
+          toErrorInstance('ENDGAME_TECHNIQUE',
+            ctx,
             move,
             `Endgame ${move.severity} on move ${move.moveNumber} (${move.san}); ${move.bestMove} was the technique.`,
           ),

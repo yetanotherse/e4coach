@@ -19,6 +19,13 @@ export const BLUNDER_WP = 0.2;
 
 const CP_CLAMP = 2000;
 
+/**
+ * A position is "already decided" when one side is winning by ~6 pawns before
+ * the move. Errors from decided positions are not instructive (kicking a dead
+ * horse) and cluster at game end, so most detectors skip them.
+ */
+export const DECIDED_CP = 600;
+
 /** Normalize an EngineEval (side-to-move POV) to a bounded centipawn number. */
 export function cpFromEval(e: EngineEval): number {
   if (typeof e.mate === 'number') {
@@ -71,6 +78,8 @@ export interface ScoreExtras {
   /** whether the engine's best move was a forcing shot the user missed */
   bestMoveForcing: boolean;
   userMaterialLossNextPly: number;
+  /** position was already ~winning/losing before this move (|cpBefore| >= DECIDED_CP) */
+  decided: boolean;
 }
 
 /**
@@ -115,6 +124,7 @@ export function scoreUserMoves(
       clockRemaining: clockAt(parsed.game, ply),
       bestMoveForcing: bestMoveIsForcing(ply.fenBefore, evalBefore.bestMove),
       userMaterialLossNextPly: ply.userMaterialLossNextPly ?? 0,
+      decided: Math.abs(cpBefore) >= DECIDED_CP,
     });
   }
   return out;

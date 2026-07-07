@@ -9,8 +9,25 @@ import { ALL_DETECTORS, type GameContext } from '../detectors/index.js';
 import { clamp } from './cpl.js';
 
 const LOW_CONFIDENCE_GAMES = 10; // spec §9.3
-const MAX_EXAMPLES = 3; // spec §9.1.6
+const DEFAULT_MAX_EXAMPLES = 10;
 const TOP_N = 3; // spec §9.1.7
+
+/**
+ * Per-move categories claim each (gameId, ply) exactly once, by priority — the
+ * specific "what" (hanging piece, missed tactic) beats the contextual
+ * "where/when" (endgame, time trouble). Prevents a single mistake from being
+ * counted in several categories (e.g. an endgame hang inflating ENDGAME_TECHNIQUE).
+ * Categories absent here (FAILED_CONVERSION, POSITIONAL_DRIFT) are game-level and
+ * exempt.
+ */
+const PER_MOVE_PRIORITY: Partial<Record<WeaknessCategory, number>> = {
+  HANGING_PIECE: 1,
+  MISSED_TACTIC: 2,
+  WEAK_DEFENSE: 3,
+  TIME_TROUBLE: 4,
+  ENDGAME_TECHNIQUE: 5,
+  OPENING_INACCURACY: 6,
+};
 
 /** Heuristic rating-points-lost estimate for one error instance from its CPL. */
 export function instanceImpact(cpl: number): number {
@@ -24,9 +41,14 @@ export interface AggregateInput {
   contexts: GameContext[];
   movesScored: number;
   engineMeta: WeaknessProfile['engineMeta'];
+  /** max example positions per weakness (default 10, spec feedback #5) */
+  maxExamples?: number;
+  /** analysis scope surfaced to the user (spec feedback #6) */
+  scope?: WeaknessProfile['scope'];
 }
 
 export function aggregateProfile(input: AggregateInput): WeaknessProfile {
+  const maxExamples = input.maxExamples ?? DEFAULT_MAX_EXAMPLES;
   const byCategory = new Map<WeaknessCategory, ErrorInstance[]>();
   for (const cat of WEAKNESS_CATEGORIES) byCategory.set(cat, []);
 
@@ -38,6 +60,8 @@ export function aggregateProfile(input: AggregateInput): WeaknessProfile {
     }
   }
 
+  dedupePerMoveInstances(byCategory);
+
   const categories: WeaknessCategoryStat[] = [];
   for (const cat of WEAKNESS_CATEGORIES) {
     const instances = byCategory.get(cat)!;
@@ -45,9 +69,7 @@ export function aggregateProfile(input: AggregateInput): WeaknessProfile {
     const estimatedRatingLoss = Math.round(
       instances.reduce((sum, i) => sum + instanceImpact(i.cpl), 0),
     );
-    const examples = [...instances]
-      .sort((a, b) => b.cpl - a.cpl)
-      .slice(0, MAX_EXAMPLES);
+    const examples = selectExamples(instances, maxExamples);
     categories.push({ category: cat, frequency: instances.length, estimatedRatingLoss, examples });
   }
 
@@ -68,5 +90,63 @@ export function aggregateProfile(input: AggregateInput): WeaknessProfile {
     categories,
     topWeaknesses: ranked.slice(0, TOP_N).map((c) => c.category),
     engineMeta: input.engineMeta,
+    ...(input.scope ? { scope: input.scope } : {}),
   };
+}
+
+/**
+ * Enforce single-assignment: for each (gameId, ply) claimed by multiple per-move
+ * categories, keep only the highest-priority category's instance.
+ */
+function dedupePerMoveInstances(byCategory: Map<WeaknessCategory, ErrorInstance[]>): void {
+  const winner = new Map<string, number>(); // key -> best priority seen
+  const keyOf = (i: ErrorInstance): string => `${i.gameId}:${i.ply}`;
+
+  for (const [cat, instances] of byCategory) {
+    const priority = PER_MOVE_PRIORITY[cat];
+    if (priority === undefined) continue;
+    for (const inst of instances) {
+      const k = keyOf(inst);
+      const best = winner.get(k);
+      if (best === undefined || priority < best) winner.set(k, priority);
+    }
+  }
+
+  for (const [cat, instances] of byCategory) {
+    const priority = PER_MOVE_PRIORITY[cat];
+    if (priority === undefined) continue;
+    byCategory.set(
+      cat,
+      instances.filter((i) => winner.get(keyOf(i)) === priority),
+    );
+  }
+}
+
+/**
+ * Pick the most instructive examples: prefer mistakes made in competitive
+ * positions (turning an equal/near-equal game bad teaches more than a slip when
+ * already winning/losing) and spread across distinct games, then by CPL.
+ */
+export function selectExamples(instances: ErrorInstance[], max: number): ErrorInstance[] {
+  const scored = [...instances].sort((a, b) => instructiveness(b) - instructiveness(a));
+  const seenGames = new Set<string>();
+  const spread: ErrorInstance[] = [];
+  const rest: ErrorInstance[] = [];
+  // First pass: one per distinct game, in instructiveness order.
+  for (const inst of scored) {
+    if (!seenGames.has(inst.gameId)) {
+      seenGames.add(inst.gameId);
+      spread.push(inst);
+    } else {
+      rest.push(inst);
+    }
+  }
+  return [...spread, ...rest].slice(0, max);
+}
+
+function instructiveness(i: ErrorInstance): number {
+  // Competitive positions score higher: full weight near equality, decaying as
+  // the position was already decided before the mistake.
+  const competitiveness = 1 - Math.min(Math.abs(i.cpBefore) / 800, 0.85);
+  return i.cpl * competitiveness;
 }

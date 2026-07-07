@@ -25,7 +25,12 @@ export async function processNextJob(deps: RunDeps): Promise<boolean> {
   const user = await db.user.findUniqueOrThrow({ where: { id: job.userId } });
   try {
     await runJob(
-      { id: job.id, userId: job.userId, source: job.source },
+      {
+        id: job.id,
+        userId: job.userId,
+        source: job.source,
+        params: job.params as { maxGames?: number; perfTypes?: string[] } | null,
+      },
       {
         id: user.id,
         email: user.email,

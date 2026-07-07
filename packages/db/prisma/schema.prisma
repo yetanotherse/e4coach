@@ -33,6 +33,7 @@ model AnalysisJob {
   status     JobStatus @default(PENDING)
   stage      String? // fine-grained progress for the UI
   gameCount  Int       @default(0)
+  params     Json? // user-chosen selection: { maxGames, perfTypes }
   engineMeta Json? // { kind, version, depth/movetime }
   error      String?
   // idempotency / resumability: which pipeline stage outputs are persisted

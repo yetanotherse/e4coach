@@ -9,6 +9,7 @@ import {
   aggregateProfile,
   parseGame,
   scoreUserMoves,
+  type AnalysisScope,
   type Analytics,
   type ChessEngine,
   type GameContext,
@@ -32,15 +33,26 @@ export interface RunDeps {
   analytics: Analytics;
   mailer: Mailer;
   appUrl: string;
+  /** hard ceiling on games per job (bounds cost, spec §17) */
   maxGames: number;
+  maxExamples: number;
   movetimeMs: number;
+}
+
+/** Per-job selection controls chosen by the user (spec feedback #6). */
+export interface JobParams {
+  maxGames?: number;
+  perfTypes?: string[];
 }
 
 export interface JobRecord {
   id: string;
   userId: string;
   source: string;
+  params?: JobParams | null;
 }
+
+const DEFAULT_PERF_TYPES = ['blitz', 'rapid', 'classical'];
 
 export interface UserRecord {
   id: string;
@@ -62,10 +74,14 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     if (!user.lichessUser) throw new Error('user has no lichess username');
 
     // ── Stage 1: fetch ──────────────────────────────────────────────
+    // Honor the user's chosen count/time-controls, hard-capped to bound cost.
+    const requestedMax = Math.min(job.params?.maxGames ?? deps.maxGames, deps.maxGames);
+    const perfTypes = job.params?.perfTypes?.length ? job.params.perfTypes : DEFAULT_PERF_TYPES;
     await setStage(db, job.id, 'FETCHING', 'fetching games');
     const games = await deps.gameSource.fetchRecentGames(user.lichessUser, {
-      max: deps.maxGames,
+      max: requestedMax,
       rated: true,
+      perfTypes,
     });
     await db.analysisJob.update({ where: { id: job.id }, data: { gameCount: games.length } });
 
@@ -74,12 +90,15 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     const { contexts, movesScored, evalCount, skipped } = await analyzeGames(games, deps);
 
     await setStage(db, job.id, 'CLASSIFYING', 'classifying weaknesses');
+    const scope = buildScope(games, contexts.length, skipped, requestedMax, perfTypes);
     const profile = aggregateProfile({
       username: user.lichessUser,
       source: job.source,
       contexts,
       movesScored,
       engineMeta,
+      maxExamples: deps.maxExamples,
+      scope,
     });
 
     // ── Stage 5: generate report ────────────────────────────────────
@@ -151,7 +170,7 @@ async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<Analy
       evalCount += n;
       const moves = scoreUserMoves(parsed, lookup);
       movesScored += moves.length;
-      contexts.push({ game, moves });
+      contexts.push({ game, moves, plies: parsed.plies });
     } catch (err) {
       // One bad game must not fail the whole job (spec §11.4).
       skipped++;
@@ -160,6 +179,27 @@ async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<Analy
   }
 
   return { contexts, movesScored, evalCount, skipped };
+}
+
+/** Summarize what was actually analyzed, for user-facing transparency (#6). */
+function buildScope(
+  games: ImportedGame[],
+  gamesAnalyzed: number,
+  skipped: number,
+  requestedMax: number,
+  perfTypes: string[],
+): AnalysisScope {
+  const dates = games.map((g) => g.playedAt).filter(Boolean).sort();
+  const timeControls = [...new Set(games.map((g) => g.timeControl).filter(Boolean))];
+  return {
+    requestedMax,
+    gamesFetched: games.length,
+    gamesAnalyzed,
+    skipped,
+    perfTypes,
+    timeControls,
+    ...(dates.length ? { dateFrom: dates[0], dateTo: dates[dates.length - 1] } : {}),
+  };
 }
 
 type Stage =

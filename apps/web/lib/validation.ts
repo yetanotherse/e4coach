@@ -8,18 +8,25 @@ const lichessUsername = z
   .max(30)
   .regex(/^[\w-]+$/, 'Invalid username');
 
+/** User-selectable analysis scope (spec feedback #6). Server hard-caps count. */
+export const PERF_TYPES = ['bullet', 'blitz', 'rapid', 'classical'] as const;
+
+export const JobParamsSchema = z.object({
+  maxGames: z.coerce.number().int().min(5).max(100).optional(),
+  perfTypes: z.array(z.enum(PERF_TYPES)).min(1).max(4).optional(),
+});
+export type JobParamsInput = z.infer<typeof JobParamsSchema>;
+
 export const SignupSchema = z.object({
   email: z.string().trim().email().max(254),
   lichessUser: lichessUsername,
   consent: z.literal(true, { errorMap: () => ({ message: 'Consent is required' }) }),
+  maxGames: JobParamsSchema.shape.maxGames,
+  perfTypes: JobParamsSchema.shape.perfTypes,
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
 
 export const InterestSchema = z.object({
   tier: z.enum(['notify', 'monthly', 'annual']),
   reportSlug: z.string().max(64).optional(),
-});
-
-export const AnalyzeSchema = z.object({
-  userId: z.string().min(1),
 });

@@ -47,6 +47,7 @@ function makeDeps(db: PrismaClient, over: Partial<RunDeps> = {}): RunDeps {
     mailer: new MockMailer(),
     appUrl: 'http://localhost:3000',
     maxGames: 20,
+    maxExamples: 10,
     movetimeMs: 150,
     ...over,
   };

@@ -12,13 +12,13 @@ export const missedTacticDetector: Detector = {
   detect(ctx: GameContext): ErrorInstance[] {
     const out: ErrorInstance[] = [];
     for (const move of ctx.moves) {
+      if (move.decided) continue; // already winning/losing — not instructive
       const bigSwing = move.severity === 'blunder' || move.severity === 'mistake';
       const droppedMaterial = move.userMaterialLossNextPly >= 3;
       if (bigSwing && move.bestMoveForcing && !droppedMaterial && move.san !== move.bestMove) {
         out.push(
-          toErrorInstance(
-            'MISSED_TACTIC',
-            ctx.game,
+          toErrorInstance('MISSED_TACTIC',
+            ctx,
             move,
             `Missed a forcing tactic (${move.bestMove}); played ${move.san} instead.`,
           ),

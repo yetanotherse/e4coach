@@ -50,4 +50,15 @@ describe('GeminiFlashProvider', () => {
     expect(calls).toBe(2);
     expect(result.text).toBe('done');
   });
+
+  it('does NOT retry a 404 (permanent error)', async () => {
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      return new Response('model not found', { status: 404 });
+    }) as unknown as typeof fetch;
+    const provider = new GeminiFlashProvider({ apiKey: 'k', model: 'm', fetchImpl, maxRetries: 3 });
+    await expect(provider.generate([{ role: 'user', content: 'hi' }])).rejects.toThrow(/404/);
+    expect(calls).toBe(1); // failed fast, no retries
+  });
 });

@@ -21,6 +21,13 @@ describe('hangingPieceDetector', () => {
     const ctx = { game: makeGame(), moves: [moveWith('blunder', { userMaterialLossNextPly: 0 })] };
     expect(hangingPieceDetector.detect(ctx)).toHaveLength(0);
   });
+  it('ignores a hang in an already-decided position (not instructive)', () => {
+    const ctx = {
+      game: makeGame(),
+      moves: [moveWith('blunder', { userMaterialLossNextPly: 5, decided: true })],
+    };
+    expect(hangingPieceDetector.detect(ctx)).toHaveLength(0);
+  });
 });
 
 describe('missedTacticDetector', () => {
@@ -78,15 +85,22 @@ describe('failedConversionDetector', () => {
 });
 
 describe('weakDefenseDetector', () => {
-  it('flags a collapse while already losing', () => {
+  it('flags a collapse from a holdable-but-worse position', () => {
     const ctx = {
       game: makeGame(),
-      moves: [moveWith('blunder', { cpBefore: -300 })],
+      moves: [moveWith('blunder', { cpBefore: -300, cpAfter: -600 })],
     };
     expect(weakDefenseDetector.detect(ctx)).toHaveLength(1);
   });
   it('ignores errors from an equal position', () => {
-    const ctx = { game: makeGame(), moves: [moveWith('blunder', { cpBefore: 20 })] };
+    const ctx = { game: makeGame(), moves: [moveWith('blunder', { cpBefore: 20, cpAfter: -500 })] };
+    expect(weakDefenseDetector.detect(ctx)).toHaveLength(0);
+  });
+  it('ignores collapses from an already dead-lost position', () => {
+    const ctx = {
+      game: makeGame(),
+      moves: [moveWith('blunder', { cpBefore: -900, cpAfter: -1800 })],
+    };
     expect(weakDefenseDetector.detect(ctx)).toHaveLength(0);
   });
 });

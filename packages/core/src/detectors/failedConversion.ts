@@ -29,9 +29,8 @@ export const failedConversionDetector: Detector = {
     if (!peak) return [];
     const outcome = ctx.game.result === '1/2-1/2' ? 'only drew' : 'went on to lose';
     return [
-      toErrorInstance(
-        'FAILED_CONVERSION',
-        ctx.game,
+      toErrorInstance('FAILED_CONVERSION',
+            ctx,
         peak,
         `Reached a winning position (+${(peak.cpBefore / 100).toFixed(1)}) but ${outcome}.`,
       ),

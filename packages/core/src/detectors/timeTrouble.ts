@@ -21,9 +21,8 @@ export const timeTroubleDetector: Detector = {
         (move.severity === 'blunder' || move.severity === 'mistake')
       ) {
         out.push(
-          toErrorInstance(
-            'TIME_TROUBLE',
-            ctx.game,
+          toErrorInstance('TIME_TROUBLE',
+            ctx,
             move,
             `${move.severity} on move ${move.moveNumber} with only ${(clock / 100).toFixed(0)}s left.`,
           ),

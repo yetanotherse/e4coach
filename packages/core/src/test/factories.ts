@@ -39,6 +39,7 @@ export function makeMove(overrides: Partial<DetectorMove> = {}): DetectorMove {
     isCheck: false,
     bestMoveForcing: false,
     userMaterialLossNextPly: 0,
+    decided: false,
     ...overrides,
   };
 }

@@ -39,8 +39,8 @@ async function main(): Promise<void> {
     evalTotal += evalCount;
     const moves = scoreUserMoves(parsed, lookup);
     movesScored += moves.length;
-    contexts.push({ game, moves });
-    console.log(`  ${game.id}: ${moves.length} user moves scored (${evalCount} evals)`);
+    contexts.push({ game, moves, plies: parsed.plies });
+    console.log(`  ${game.id} (${game.userColor}): ${moves.length} user moves scored (${evalCount} evals)`);
   }
   await engine.dispose();
 
@@ -68,7 +68,9 @@ async function main(): Promise<void> {
     console.log(w.explanation);
     console.log('→', w.recommendation);
     for (const ex of w.examples) {
-      console.log(`   e.g. move ${ex.moveNumber}: ${ex.playedMove} (better: ${ex.betterMove}) ${ex.gameUrl ?? ''}`);
+      console.log(
+        `   [${ex.userColor}] game ${ex.gameId} move ${ex.moveNumber}: ${ex.playedMove} (better ${ex.betterMove}, cpBefore ${ex.cpBefore}) ${ex.gameUrl ?? ''}`,
+      );
     }
   }
 }

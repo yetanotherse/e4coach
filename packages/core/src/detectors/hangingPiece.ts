@@ -13,12 +13,12 @@ export const hangingPieceDetector: Detector = {
   detect(ctx: GameContext): ErrorInstance[] {
     const out: ErrorInstance[] = [];
     for (const move of ctx.moves) {
+      if (move.decided) continue; // already winning/losing — not instructive
       const lost = move.userMaterialLossNextPly;
       if (lost >= 3 && (move.severity === 'blunder' || move.severity === 'mistake')) {
         out.push(
-          toErrorInstance(
-            'HANGING_PIECE',
-            ctx.game,
+          toErrorInstance('HANGING_PIECE',
+            ctx,
             move,
             `Left material hanging: dropped ~${lost} points of material after ${move.san}.`,
           ),

@@ -30,7 +30,8 @@ function factsFor(profile: WeaknessProfile) {
       name: CATEGORY_META[c.category].displayName,
       frequency: c.frequency,
       estimatedRatingLoss: c.estimatedRatingLoss,
-      examples: c.examples.map((e) => ({
+      // Cap examples sent to the model for token control; the UI shows all.
+      examples: c.examples.slice(0, 4).map((e) => ({
         moveNumber: e.moveNumber,
         youPlayed: e.playedMove,
         betterMove: e.betterMove,

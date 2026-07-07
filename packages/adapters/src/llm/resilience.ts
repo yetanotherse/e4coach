@@ -7,7 +7,25 @@ export interface ResilienceOptions {
   onUsage?: (usage: { provider: string; model: string; inputTokens: number; outputTokens: number }) => void;
 }
 
-/** Retry with exponential backoff + jitter; hard per-attempt timeout. */
+/** Error carrying an HTTP status so we can decide whether to retry. */
+export interface StatusError extends Error {
+  status?: number;
+}
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+/**
+ * Only transient failures are worth retrying: network/abort errors (no status),
+ * rate limits (429), and 5xx. A 4xx like 404 ("model no longer available") or
+ * 400/403 is permanent — retrying just multiplies the error (spec §11.4).
+ */
+export function isRetryable(err: unknown): boolean {
+  const status = (err as StatusError | undefined)?.status;
+  if (status === undefined) return true; // network/timeout/abort
+  return RETRYABLE_STATUS.has(status);
+}
+
+/** Retry transient failures with exponential backoff + jitter; hard per-attempt timeout. */
 export async function withResilience(
   fn: (signal: AbortSignal) => Promise<LlmResult>,
   opts: ResilienceOptions,
@@ -29,8 +47,10 @@ export async function withResilience(
       return result;
     } catch (err) {
       lastErr = err;
-      if (attempt < opts.maxRetries) {
+      if (attempt < opts.maxRetries && isRetryable(err)) {
         await sleep(Math.min(20_000, 500 * 2 ** attempt) + Math.random() * 250);
+      } else {
+        break; // permanent error, or out of attempts
       }
     } finally {
       clearTimeout(timer);
