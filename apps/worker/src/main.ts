@@ -1,18 +1,50 @@
 /**
- * Worker entrypoint. Phase A: boots config and prints selected providers so the
- * scaffold is runnable. Phase B replaces this with the job poll loop.
+ * Worker entrypoint. Loads config, wires adapters (mock by default), and runs
+ * the job poll loop until SIGINT/SIGTERM.
  */
 import { loadEnv } from '@chess-coach/config';
+import {
+  createAnalytics,
+  createEngine,
+  createGameSource,
+  createLlmProvider,
+} from '@chess-coach/adapters';
+import { runPollLoop } from './pipeline/poller.js';
 
-function main(): void {
+async function main(): Promise<void> {
   const env = loadEnv();
-  console.log('[worker] booted', {
-    gameSource: env.GAME_SOURCE,
-    engine: env.ENGINE_KIND,
-    llm: env.LLM_PROVIDER,
+  const controller = new AbortController();
+
+  const deps = {
+    gameSource: createGameSource(env),
+    engine: createEngine(env),
+    llm: createLlmProvider(env),
+    analytics: createAnalytics(env),
+    maxGames: env.MAX_GAMES_PER_JOB,
+    movetimeMs: env.ENGINE_MOVETIME_MS,
+  };
+
+  console.log('[worker] started', {
+    gameSource: deps.gameSource.name,
+    engine: deps.engine.name,
+    llm: deps.llm.name,
     pollMs: env.WORKER_POLL_INTERVAL_MS,
   });
-  console.log('[worker] pipeline poll loop lands in Phase B');
+
+  for (const sig of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(sig, () => {
+      console.log(`[worker] ${sig} received, shutting down`);
+      controller.abort();
+    });
+  }
+
+  await runPollLoop(deps, { intervalMs: env.WORKER_POLL_INTERVAL_MS, signal: controller.signal });
+  await deps.engine.dispose();
+  await deps.analytics.flush();
+  console.log('[worker] stopped');
 }
 
-main();
+main().catch((err) => {
+  console.error('[worker] fatal:', err);
+  process.exit(1);
+});
