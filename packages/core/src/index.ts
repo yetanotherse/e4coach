@@ -12,3 +12,6 @@ export * from './report.js';
 // Analysis engine (parse → score → aggregate → render) and detectors
 export * from './analysis/index.js';
 export * from './detectors/index.js';
+
+// Report generation prompt + grounding contract
+export * from './prompts/report.js';

@@ -13,14 +13,16 @@ import { MockEngine } from './mocks/mockEngine.js';
 import { MockLlmProvider } from './mocks/mockLlm.js';
 import { MockAnalytics } from './mocks/mockAnalytics.js';
 import { MockMailer } from './mocks/mockMailer.js';
+import { LichessGameSource } from './lichess/lichessGameSource.js';
+import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
+import { GeminiFlashProvider } from './llm/geminiProvider.js';
 
 export function createGameSource(env: Env): GameSource {
   switch (env.GAME_SOURCE) {
     case 'mock':
       return new MockGameSource();
     case 'lichess':
-      // Phase C: return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
-      throw new Error('LichessGameSource not yet implemented (Phase C)');
+      return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
   }
 }
 
@@ -29,8 +31,10 @@ export function createEngine(env: Env): ChessEngine {
     case 'mock':
       return new MockEngine();
     case 'native':
+      if (!env.STOCKFISH_PATH) throw new Error('STOCKFISH_PATH is required for native engine');
+      return new StockfishNativeEngine({ binPath: env.STOCKFISH_PATH });
     case 'wasm':
-      throw new Error(`Stockfish (${env.ENGINE_KIND}) engine not yet implemented (Phase C)`);
+      throw new Error('StockfishWasmEngine not yet implemented (fallback adapter)');
   }
 }
 
@@ -39,7 +43,8 @@ export function createLlmProvider(env: Env): LlmProvider {
     case 'mock':
       return new MockLlmProvider();
     case 'gemini':
-      throw new Error('GeminiFlashProvider not yet implemented (Phase C)');
+      if (!env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is required for gemini provider');
+      return new GeminiFlashProvider({ apiKey: env.GEMINI_API_KEY, model: env.LLM_MODEL });
   }
 }
 
