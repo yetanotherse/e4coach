@@ -62,9 +62,3 @@ export interface ScoredMove {
 }
 
 export type GamePhase = 'opening' | 'middlegame' | 'endgame';
-
-/** Convenience bundle passed to detectors for a single game. */
-export interface GameContext {
-  game: ImportedGame;
-  moves: ScoredMove[];
-}
