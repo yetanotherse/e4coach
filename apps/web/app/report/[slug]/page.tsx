@@ -49,7 +49,12 @@ export default async function ReportPage({ params }: { params: { slug: string } 
 
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">{content.headline}</h1>
+          {profile.username && (
+            <p className="text-sm font-medium text-brand">
+              Analysis for {profile.username} on {profile.source === 'lichess' ? 'Lichess' : profile.source}
+            </p>
+          )}
+          <h1 className="mt-1 text-3xl font-bold">{content.headline}</h1>
           <p className="mt-2 text-neutral-600">{content.intro}</p>
           {scope && <p className="mt-2 text-sm text-neutral-500">{scope}</p>}
         </div>

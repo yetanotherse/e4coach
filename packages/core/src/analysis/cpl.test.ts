@@ -62,6 +62,21 @@ describe('scoreUserMoves', () => {
     expect(scored.every((m) => m.severity === undefined)).toBe(true);
   });
 
+  it('never flags a move that equals the engine best move (feedback #2)', () => {
+    const parsed = parseGame(game);
+    const firstUser = parsed.plies.find((p) => p.userMove)!;
+    // Engine "best" == the move actually played; even with a fabricated swing,
+    // playing the top move cannot be a mistake.
+    const lookup = (fen: string): EngineEval =>
+      fen === firstUser.fenBefore
+        ? { cp: 300, bestMove: firstUser.uci, pv: [], depth: 12 }
+        : { cp: 300, bestMove: 'x', pv: [], depth: 12 };
+    const scored = scoreUserMoves(parsed, lookup);
+    const first = scored.find((m) => m.ply === firstUser.index)!;
+    expect(first.cpl).toBeGreaterThan(0); // there is an apparent swing
+    expect(first.severity).toBeUndefined(); // but it's not flagged
+  });
+
   it('computes centipawn loss from user perspective', () => {
     const parsed = parseGame(game);
     const firstUserFenBefore = parsed.plies.find((p) => p.userMove)!.fenBefore;

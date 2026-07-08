@@ -24,7 +24,7 @@ export const timeTroubleDetector: Detector = {
           toErrorInstance('TIME_TROUBLE',
             ctx,
             move,
-            `${move.severity} on move ${move.moveNumber} with only ${(clock / 100).toFixed(0)}s left.`,
+            `You had only ${(clock / 100).toFixed(0)}s on the clock — a time-pressure slip.`,
           ),
         );
       }

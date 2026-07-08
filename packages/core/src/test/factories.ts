@@ -28,6 +28,7 @@ export function makeMove(overrides: Partial<DetectorMove> = {}): DetectorMove {
     ply: 0,
     moveNumber: 1,
     san: 'e4',
+    uci: 'e2e4',
     fenBefore: START_FEN,
     fenAfter: START_FEN,
     cpBefore: 0,

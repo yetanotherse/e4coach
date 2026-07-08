@@ -20,7 +20,7 @@ export const hangingPieceDetector: Detector = {
           toErrorInstance('HANGING_PIECE',
             ctx,
             move,
-            `Left material hanging: dropped ~${lost} points of material after ${move.san}.`,
+            `You left a piece hanging — about ${lost} points of material dropped for nothing.`,
           ),
         );
       }

@@ -12,10 +12,18 @@ export interface ExampleData {
   playedMove: string;
   playedMoveUci?: string;
   betterMove: string;
+  betterMoveSan?: string;
+  cpBefore: number;
+  assessment: string;
   userColor: 'white' | 'black';
   gameUrl?: string;
   note: string;
   line?: { fens: string[]; sans: string[]; focusIndex: number };
+}
+
+/** Was the position already lost before the move? (spec feedback #4) */
+function alreadyLost(cpBefore: number): boolean {
+  return cpBefore <= -300;
 }
 
 export function MoveExample({ ex }: { ex: ExampleData }) {
@@ -63,10 +71,24 @@ export function MoveExample({ ex }: { ex: ExampleData }) {
       ) : null}
 
       <figcaption className="mt-2 text-sm text-neutral-600">
-        <span>
-          Move {ex.moveNumber}: you played <strong>{ex.playedMove}</strong> ({ex.note})
+        <span className="flex flex-wrap items-center gap-2">
+          <span>
+            Move {ex.moveNumber}: you played <strong>{ex.playedMove}</strong>
+            {ex.betterMoveSan ? (
+              <>
+                {' '}
+                — better was <strong className="text-green-700">{ex.betterMoveSan}</strong>
+              </>
+            ) : null}
+          </span>
+          {alreadyLost(ex.cpBefore) && (
+            <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-xs text-neutral-600">
+              already losing
+            </span>
+          )}
         </span>
-        <span className="mt-1 flex gap-3">
+        <span className="mt-1 block text-neutral-700">{ex.note}</span>
+        <span className="mt-1 flex gap-3 text-xs">
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-red-500" /> your move
           </span>
