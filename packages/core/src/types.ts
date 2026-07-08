@@ -26,6 +26,7 @@ export interface ImportedGame {
   userColor: Color;
   result: string; // '1-0' | '0-1' | '1/2-1/2'
   timeControl: string;
+  speed?: string; // bullet | blitz | rapid | classical | correspondence
   eco?: string;
   opening?: string;
   clocks?: number[]; // centiseconds remaining per ply, if provided

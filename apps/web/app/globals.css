@@ -13,3 +13,25 @@
 body {
   @apply bg-neutral-50 text-neutral-900 antialiased;
 }
+
+/* PDF export via browser print-to-PDF: lay the report out for paper. */
+@media print {
+  :root {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  body {
+    background: #fff;
+  }
+  /* Keep chess piece sprites (CSS background images) in the print. */
+  cg-board,
+  .cg-wrap piece {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  /* Don't split a weakness section or an example across pages. */
+  section,
+  figure {
+    break-inside: avoid;
+  }
+}

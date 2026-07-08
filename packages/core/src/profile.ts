@@ -68,7 +68,8 @@ export interface AnalysisScope {
   gamesFetched: number;
   gamesAnalyzed: number;
   skipped: number;
-  perfTypes: string[];
+  perfTypes: string[]; // what the user requested
+  gameTypes: string[]; // the actual speeds present in the analyzed games
   timeControls: string[];
   dateFrom?: string; // ISO date of earliest game
   dateTo?: string; // ISO date of latest game

@@ -46,7 +46,7 @@ export function MoveExample({ ex }: { ex: ExampleData }) {
       </div>
 
       {stepping && line ? (
-        <div className="mt-2 flex items-center justify-center gap-3 text-sm">
+        <div className="mt-2 flex items-center justify-center gap-3 text-sm print:hidden">
           <button
             onClick={() => setIdx((i) => Math.max(0, i - 1))}
             disabled={idx === 0}
@@ -103,7 +103,7 @@ export function MoveExample({ ex }: { ex: ExampleData }) {
                 setStepping((s) => !s);
                 setIdx(line.focusIndex);
               }}
-              className="text-brand underline"
+              className="text-brand underline print:hidden"
             >
               {stepping ? 'Hide moves' : 'Step through'}
             </button>
