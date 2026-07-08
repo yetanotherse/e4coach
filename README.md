@@ -19,6 +19,24 @@ A personal chess coach. Turns a user's own Lichess games into a clear, personal
    exact move on Lichess).
 5. Full funnel + retention is instrumented in **PostHog**; a fake-door measures willingness-to-pay.
 
+## How weaknesses are ranked
+
+Weakness sections are ordered by **estimated rating impact**, not by raw number of issues. For
+each category we sum a per-instance impact derived from centipawn loss (`estimatedRatingLoss`);
+categories are then sorted by that total, with **frequency** (issue count) as a tiebreaker and
+taxonomy order as the final fallback. The top 3 by this measure become the report's headline
+weaknesses (`aggregateProfile` in `packages/core/src/analysis/aggregate.ts`).
+
+This is intentional: a few game-losing blunders usually matter more than many tiny inaccuracies,
+so a category with fewer but more severe mistakes can rank above one with more frequent, minor
+ones. Each section still shows "We saw this N times," so the issue count is always visible even
+though it is not the sort key.
+
+Game selection is a **filter, not a per-type quota**: picking multiple time controls analyzes the
+most-recent N games matching *any* of them (sorted by date). A bullet-heavy player who selects
+bullet/blitz/rapid may therefore get an all-bullet sample; the report's scope line calls this out
+when the selection and the analyzed sample differ.
+
 ## Monorepo layout
 
 ```
