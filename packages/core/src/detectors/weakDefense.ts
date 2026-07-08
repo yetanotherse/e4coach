@@ -27,7 +27,7 @@ export const weakDefenseDetector: Detector = {
           toErrorInstance('WEAK_DEFENSE',
             ctx,
             move,
-            `Under pressure (${(move.cpBefore / 100).toFixed(1)}), ${move.san} let it collapse further; ${move.bestMove} held tougher.`,
+            `You were already worse, and this let the position collapse to lost instead of holding on.`,
           ),
         );
       }

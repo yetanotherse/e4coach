@@ -3,6 +3,7 @@
  * scored moves that returns the error instances it recognizes. Detectors never
  * do I/O and never call the engine — they read the pre-computed ScoredMoves.
  */
+import { Chess } from 'chess.js';
 import type { ImportedGame } from '../types.js';
 import type { ScoreExtras } from '../analysis/cpl.js';
 import type { Ply } from '../analysis/parse.js';
@@ -28,14 +29,22 @@ export interface Detector {
 const LINE_BEFORE = 2; // plies of context before the mistake
 const LINE_AFTER = 2; // plies of context after the mistake
 
-/** Helper: build an ErrorInstance from a move, filling common fields. */
+/**
+ * Helper: build an ErrorInstance from a move. The `lead` is the detector's
+ * category-specific insight; we elaborate it deterministically with the
+ * position assessment, the eval swing, and the better move in SAN (spec
+ * feedback #4/#5) — all grounded facts, no LLM.
+ */
 export function toErrorInstance(
   category: WeaknessCategory,
   ctx: GameContext,
   move: DetectorMove,
-  note: string,
+  lead: string,
 ): ErrorInstance {
   const ply = ctx.plies?.[move.ply];
+  const betterMoveSan = uciToSan(move.fenBefore, move.bestMove);
+  const assessment = assessEval(move.cpBefore);
+  const note = elaborate(lead, move, assessment, betterMoveSan);
   return {
     category,
     gameId: ctx.game.id,
@@ -46,12 +55,68 @@ export function toErrorInstance(
     playedMove: move.san,
     ...(ply?.uci ? { playedMoveUci: ply.uci } : {}),
     betterMove: move.bestMove,
+    ...(betterMoveSan ? { betterMoveSan } : {}),
     cpl: move.cpl,
     cpBefore: move.cpBefore,
+    cpAfter: move.cpAfter,
+    assessment,
     userColor: ctx.game.userColor,
     ...(ctx.plies ? { line: buildLine(ctx.plies, move.ply) } : {}),
     note,
   };
+}
+
+/** Convert a UCI move to SAN in the given position (returns undefined if illegal). */
+function uciToSan(fen: string, uci: string): string | undefined {
+  if (!uci || uci.length < 4) return undefined;
+  try {
+    const chess = new Chess(fen);
+    const move = chess.move({
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      promotion: uci.length > 4 ? uci.slice(4, 5) : undefined,
+    });
+    return move.san;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Plain-language read of a user-POV centipawn eval before the move. */
+export function assessEval(cp: number): string {
+  const pawns = (cp / 100).toFixed(1);
+  const signed = cp > 0 ? `+${pawns}` : pawns;
+  if (cp >= 300) return `winning (${signed})`;
+  if (cp >= 100) return `clearly better (${signed})`;
+  if (cp >= 40) return `slightly better (${signed})`;
+  if (cp > -40) return `roughly equal (${signed})`;
+  if (cp > -100) return `slightly worse (${signed})`;
+  if (cp > -300) return `clearly worse (${signed})`;
+  return `losing (${signed})`;
+}
+
+/** Build a 2–4 sentence, fact-grounded explanation around the detector's lead. */
+function elaborate(
+  lead: string,
+  move: DetectorMove,
+  assessment: string,
+  betterMoveSan: string | undefined,
+): string {
+  const before = fmtEval(move.cpBefore);
+  const after = fmtEval(move.cpAfter);
+  const parts = [`Before the move you were ${assessment}.`, lead];
+  if (move.cpl >= 40) {
+    parts.push(`The evaluation swung from ${before} to ${after}.`);
+  }
+  if (betterMoveSan && betterMoveSan !== move.san) {
+    parts.push(`The engine preferred ${betterMoveSan}.`);
+  }
+  return parts.join(' ');
+}
+
+function fmtEval(cp: number): string {
+  const pawns = (cp / 100).toFixed(1);
+  return cp > 0 ? `+${pawns}` : pawns;
 }
 
 /** A short board-state window around the mistake, for the stepper. */

@@ -32,7 +32,7 @@ export const failedConversionDetector: Detector = {
       toErrorInstance('FAILED_CONVERSION',
             ctx,
         peak,
-        `Reached a winning position (+${(peak.cpBefore / 100).toFixed(1)}) but ${outcome}.`,
+        `You reached a winning position here but ${outcome} — converting a won game is a learnable skill.`,
       ),
     ];
   },

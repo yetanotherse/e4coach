@@ -18,7 +18,7 @@ export const openingInaccuracyDetector: Detector = {
           toErrorInstance('OPENING_INACCURACY',
             ctx,
             move,
-            `Early ${move.severity} on move ${move.moveNumber} (${move.san}); ${move.bestMove} was stronger.`,
+            `This was an early ${move.severity} in the opening, before you reached the middlegame.`,
           ),
         );
       }

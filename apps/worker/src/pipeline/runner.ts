@@ -131,7 +131,12 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
 
     // Notify the user their report is ready. Email failure must not fail the job.
     try {
-      await sendReportReadyEmail(deps.mailer, user.email, `${deps.appUrl}/report/${slug}`);
+      await sendReportReadyEmail(
+        deps.mailer,
+        user.email,
+        `${deps.appUrl}/report/${slug}`,
+        user.lichessUser,
+      );
     } catch (err) {
       console.warn('[runner] report-ready email failed:', err instanceof Error ? err.message : err);
     }

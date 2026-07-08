@@ -23,13 +23,17 @@ export interface ErrorInstance {
   playedMove: string; // SAN of the move the user played
   playedMoveUci?: string; // UCI of the played move (for a red arrow)
   betterMove: string; // UCI of the engine's better move (for a green arrow)
+  betterMoveSan?: string; // human-readable SAN of the better move
   cpl: number;
   cpBefore: number; // user-POV eval before the move (for example ranking)
+  cpAfter: number; // user-POV eval after the move (for the swing)
+  /** plain-language read of the position before the move, e.g. "losing (−5.2)" */
+  assessment: string;
   /** which side the user played — orient the board to this (spec feedback #3) */
   userColor: 'white' | 'black';
   /** short move window around the mistake for the stepper */
   line?: ExampleLine;
-  /** short, factual note produced by the detector (not the LLM) */
+  /** elaborated, factual explanation produced deterministically (not the LLM) */
   note: string;
 }
 

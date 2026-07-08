@@ -17,6 +17,7 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
   const router = useRouter();
   const [status, setStatus] = useState('PENDING');
   const [stage, setStage] = useState<string | null>(null);
+  const [lichessUser, setLichessUser] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
         }
         setStatus(json.data.status);
         setStage(json.data.stage);
+        setLichessUser(json.data.lichessUser ?? null);
         if (json.data.status === 'DONE' && json.data.reportSlug) {
           router.push(`/report/${json.data.reportSlug}`);
           return;
@@ -58,11 +60,13 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
       {!error ? (
         <>
           <div className="mb-6 h-12 w-12 animate-spin rounded-full border-4 border-neutral-200 border-t-brand" />
-          <h1 className="text-2xl font-semibold">Analyzing your games</h1>
+          <h1 className="text-2xl font-semibold">
+            Analyzing {lichessUser ? `${lichessUser}'s games` : 'your games'}
+          </h1>
           <p className="mt-2 text-neutral-600">{stage ?? STAGE_LABEL[status] ?? 'Working…'}</p>
           <p className="mt-8 text-xs text-neutral-400">
-            This usually takes a couple of minutes. You can safely leave — we&apos;ll email your
-            report when it&apos;s ready.
+            This might take a few minutes time depending on number of games and analysis needed. You
+            can safely leave — we&apos;ll email your report when it&apos;s ready.
           </p>
         </>
       ) : (

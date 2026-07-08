@@ -21,7 +21,7 @@ export const endgameTechniqueDetector: Detector = {
           toErrorInstance('ENDGAME_TECHNIQUE',
             ctx,
             move,
-            `Endgame ${move.severity} on move ${move.moveNumber} (${move.san}); ${move.bestMove} was the technique.`,
+            `This was an endgame ${move.severity}, where precise technique matters most.`,
           ),
         );
       }

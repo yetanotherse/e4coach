@@ -7,7 +7,10 @@ export async function GET(
 ): Promise<Response> {
   const job = await prisma.analysisJob.findUnique({
     where: { id: params.id },
-    include: { report: { select: { publicSlug: true } } },
+    include: {
+      report: { select: { publicSlug: true } },
+      user: { select: { lichessUser: true } },
+    },
   });
   if (!job) return jsonError('Job not found', 404);
 
@@ -16,6 +19,7 @@ export async function GET(
     status: job.status,
     stage: job.stage,
     gameCount: job.gameCount,
+    lichessUser: job.user.lichessUser,
     error: job.error,
     reportSlug: job.report?.publicSlug ?? null,
   });

@@ -45,6 +45,7 @@ export interface ScoredMove {
   ply: number; // 0-indexed half-move within the game
   moveNumber: number; // 1-indexed full move number
   san: string; // the move actually played
+  uci: string; // the played move in UCI (same notation as bestMove)
   fenBefore: string;
   fenAfter: string;
   /** centipawns from the USER's perspective before the move */

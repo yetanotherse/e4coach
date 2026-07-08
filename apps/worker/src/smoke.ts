@@ -69,8 +69,9 @@ async function main(): Promise<void> {
     console.log('→', w.recommendation);
     for (const ex of w.examples) {
       console.log(
-        `   [${ex.userColor}] game ${ex.gameId} move ${ex.moveNumber}: ${ex.playedMove} (better ${ex.betterMove}, cpBefore ${ex.cpBefore}) ${ex.gameUrl ?? ''}`,
+        `   [${ex.userColor}] move ${ex.moveNumber}: ${ex.playedMove} → better ${ex.betterMoveSan ?? ex.betterMove} | ${ex.assessment}`,
       );
+      console.log(`       ${ex.note}`);
     }
   }
 }

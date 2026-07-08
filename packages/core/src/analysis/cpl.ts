@@ -44,6 +44,11 @@ export function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+/** Normalize a UCI move for comparison (lowercase, trimmed). */
+export function normalizeUci(uci: string): string {
+  return uci.trim().toLowerCase();
+}
+
 /**
  * Classify severity from centipawn loss AND win-probability drop. Both must
  * clear a threshold — a large cp swing in an already-lost position (small win%
@@ -104,13 +109,18 @@ export function scoreUserMoves(
     const cpAfter = -cpFromEval(evalAfter);
     const cpl = clamp(cpBefore - cpAfter, 0, CP_CLAMP);
     const winProbDrop = winProbability(cpBefore) - winProbability(cpAfter);
-    const severity = classifySeverity(cpl, winProbDrop);
+    // You cannot have made a mistake if you played the engine's own top move —
+    // any apparent swing is engine search noise (movetime-budgeted eval). This
+    // guard eliminates false positives where played move == best move.
+    const playedBestMove = normalizeUci(ply.uci) === normalizeUci(evalBefore.bestMove);
+    const severity = playedBestMove ? undefined : classifySeverity(cpl, winProbDrop);
 
     out.push({
       gameId: parsed.game.id,
       ply: ply.index,
       moveNumber: ply.moveNumber,
       san: ply.san,
+      uci: ply.uci,
       fenBefore: ply.fenBefore,
       fenAfter: ply.fenAfter,
       cpBefore,

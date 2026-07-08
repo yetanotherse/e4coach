@@ -1,5 +1,6 @@
 import type { Detector, GameContext } from './types.js';
 import { toErrorInstance } from './types.js';
+import { normalizeUci } from '../analysis/cpl.js';
 import type { ErrorInstance } from '../profile.js';
 
 /**
@@ -15,12 +16,13 @@ export const missedTacticDetector: Detector = {
       if (move.decided) continue; // already winning/losing — not instructive
       const bigSwing = move.severity === 'blunder' || move.severity === 'mistake';
       const droppedMaterial = move.userMaterialLossNextPly >= 3;
-      if (bigSwing && move.bestMoveForcing && !droppedMaterial && move.san !== move.bestMove) {
+      const playedBest = normalizeUci(move.uci) === normalizeUci(move.bestMove);
+      if (bigSwing && move.bestMoveForcing && !droppedMaterial && !playedBest) {
         out.push(
           toErrorInstance('MISSED_TACTIC',
             ctx,
             move,
-            `Missed a forcing tactic (${move.bestMove}); played ${move.san} instead.`,
+            `A forcing tactic was available — a capture or check that wins material or leads to mate.`,
           ),
         );
       }
