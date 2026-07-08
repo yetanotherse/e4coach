@@ -17,13 +17,21 @@ function gameTypeLabel(scope: AnalysisScope): string | null {
 
 function scopeLine(scope: WeaknessProfile['scope']): string | null {
   if (!scope) return null;
-  const types = scope.gameTypes?.length ? scope.gameTypes : scope.perfTypes;
-  const typePhrase = types.length === 1 ? `${types[0]} ` : '';
+  const analyzed = scope.gameTypes?.length ? scope.gameTypes : scope.perfTypes;
+  const typePhrase = analyzed.length === 1 ? `${analyzed[0]} ` : '';
   const dates =
     scope.dateFrom && scope.dateTo ? ` played ${fmt(scope.dateFrom)}–${fmt(scope.dateTo)}` : '';
   const skipped =
     scope.skipped > 0 ? ` ${scope.skipped} were skipped (non-standard or unreadable).` : '';
-  return `Analyzed your ${scope.gamesAnalyzed} most recent rated ${typePhrase}games${dates}.${skipped}`;
+  // If the user requested types that didn't appear in their most-recent games,
+  // say so — otherwise a bullet-heavy player who picked 3 types is confused.
+  const requested = scope.perfTypes ?? [];
+  const missing = requested.filter((t) => !analyzed.includes(t));
+  const selectionNote =
+    missing.length > 0 && requested.length > 1
+      ? ` You selected ${requested.join(', ')}, but your most recent games were all ${analyzed.join(', ')}.`
+      : '';
+  return `Analyzed your ${scope.gamesAnalyzed} most recent rated ${typePhrase}games${dates}.${skipped}${selectionNote}`;
 }
 
 function fmt(iso: string): string {
