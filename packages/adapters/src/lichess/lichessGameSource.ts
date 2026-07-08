@@ -114,6 +114,7 @@ export class LichessGameSource implements GameSource {
       userColor,
       result,
       timeControl,
+      ...(g.speed ? { speed: g.speed } : {}),
       ...(g.opening?.eco ? { eco: g.opening.eco } : {}),
       ...(g.opening?.name ? { opening: g.opening.name } : {}),
       ...(g.clocks ? { clocks: g.clocks } : {}),

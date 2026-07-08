@@ -1,24 +1,37 @@
 import { notFound } from 'next/navigation';
-import type { ReportContent, WeaknessProfile } from '@chess-coach/core';
+import type { AnalysisScope, ReportContent, WeaknessProfile } from '@chess-coach/core';
 import { prisma } from '@/lib/server';
 import { MoveExample } from '@/components/MoveExample';
 import { ShareBar } from '@/components/ShareBar';
+import { PrintButton } from '@/components/PrintButton';
 import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
 
+/** e.g. "Rapid" for one type, "Mixed: blitz, rapid" for several. */
+function gameTypeLabel(scope: AnalysisScope): string | null {
+  const types = scope.gameTypes?.length ? scope.gameTypes : scope.perfTypes;
+  if (!types.length) return null;
+  if (types.length === 1) return cap(types[0]!);
+  return `Mixed: ${types.join(', ')}`;
+}
+
 function scopeLine(scope: WeaknessProfile['scope']): string | null {
   if (!scope) return null;
-  const perf = scope.perfTypes.join(', ');
+  const types = scope.gameTypes?.length ? scope.gameTypes : scope.perfTypes;
+  const typePhrase = types.length === 1 ? `${types[0]} ` : '';
   const dates =
-    scope.dateFrom && scope.dateTo
-      ? ` played ${fmt(scope.dateFrom)}–${fmt(scope.dateTo)}`
-      : '';
-  const skipped = scope.skipped > 0 ? ` ${scope.skipped} were skipped (non-standard or unreadable).` : '';
-  return `Analyzed your ${scope.gamesAnalyzed} most recent rated games (${perf})${dates}.${skipped}`;
+    scope.dateFrom && scope.dateTo ? ` played ${fmt(scope.dateFrom)}–${fmt(scope.dateTo)}` : '';
+  const skipped =
+    scope.skipped > 0 ? ` ${scope.skipped} were skipped (non-standard or unreadable).` : '';
+  return `Analyzed your ${scope.gamesAnalyzed} most recent rated ${typePhrase}games${dates}.${skipped}`;
 }
 
 function fmt(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +55,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
   const content = report.content as unknown as ReportContent;
   const profile = report.profile as unknown as WeaknessProfile;
   const scope = scopeLine(profile.scope);
+  const gameType = profile.scope ? gameTypeLabel(profile.scope) : null;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
@@ -49,16 +63,27 @@ export default async function ReportPage({ params }: { params: { slug: string } 
 
       <header className="flex items-start justify-between gap-4">
         <div>
-          {profile.username && (
-            <p className="text-sm font-medium text-brand">
-              Analysis for {profile.username} on {profile.source === 'lichess' ? 'Lichess' : profile.source}
-            </p>
-          )}
+          <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-brand">
+            {profile.username && (
+              <span>
+                Analysis for {profile.username} on{' '}
+                {profile.source === 'lichess' ? 'Lichess' : profile.source}
+              </span>
+            )}
+            {gameType && (
+              <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs text-brand-dark">
+                {gameType}
+              </span>
+            )}
+          </p>
           <h1 className="mt-1 text-3xl font-bold">{content.headline}</h1>
           <p className="mt-2 text-neutral-600">{content.intro}</p>
           {scope && <p className="mt-2 text-sm text-neutral-500">{scope}</p>}
         </div>
-        <ShareBar />
+        <div className="flex shrink-0 items-center gap-2 print:hidden">
+          <PrintButton />
+          <ShareBar />
+        </div>
       </header>
 
       {content.degraded && (
@@ -97,7 +122,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
         ))}
       </div>
 
-      <section className="mt-16">
+      <section className="mt-16 print:hidden">
         <FakeDoor reportSlug={params.slug} />
       </section>
     </main>

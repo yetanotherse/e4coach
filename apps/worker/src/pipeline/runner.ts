@@ -196,10 +196,12 @@ function buildScope(
 ): AnalysisScope {
   const dates = games.map((g) => g.playedAt).filter(Boolean).sort();
   const timeControls = [...new Set(games.map((g) => g.timeControl).filter(Boolean))];
+  const gameTypes = [...new Set(games.map((g) => g.speed).filter((s): s is string => Boolean(s)))];
   return {
     requestedMax,
     gamesFetched: games.length,
     gamesAnalyzed,
+    gameTypes,
     skipped,
     perfTypes,
     timeControls,
