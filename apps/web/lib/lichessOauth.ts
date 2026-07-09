@@ -30,7 +30,6 @@ function base64url(buf: Buffer): string {
 
 export interface StudyFlowState {
   email: string;
-  perfTypes?: string[];
   verifier: string;
   state: string;
 }
@@ -39,12 +38,12 @@ export interface StudyFlowState {
  * Begin the flow: create PKCE verifier + state, stash them (plus the email) in a
  * short-lived signed cookie, and return the Lichess authorize URL.
  */
-export function startStudyFlow(email: string, perfTypes?: string[]): string {
+export function startStudyFlow(email: string): string {
   const verifier = base64url(randomBytes(32));
   const challenge = base64url(createHash('sha256').update(verifier).digest());
   const state = base64url(randomBytes(16));
 
-  const payload: StudyFlowState = { email, verifier, state, ...(perfTypes ? { perfTypes } : {}) };
+  const payload: StudyFlowState = { email, verifier, state };
   cookies().set(STUDY_COOKIE, signToken(env.AUTH_SECRET, JSON.stringify(payload), FLOW_TTL_MS), {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',

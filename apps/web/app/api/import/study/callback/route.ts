@@ -37,11 +37,7 @@ export async function GET(req: Request): Promise<Response> {
     const token = await exchangeCode(code, flow.verifier);
     username = await fetchAccountUsername(token);
     const pgn = await fetchStudiesPgn(token, username);
-    ({ games } = parseLichessStudies(pgn, {
-      username,
-      max: IMPORT_CEILING,
-      ...(flow.perfTypes ? { perfTypes: flow.perfTypes } : {}),
-    }));
+    ({ games } = parseLichessStudies(pgn, { username, max: IMPORT_CEILING }));
   } catch (err) {
     console.error('[study callback]', err instanceof Error ? err.message : err);
     return redirect('/?studyError=fetch');
@@ -57,12 +53,7 @@ export async function GET(req: Request): Promise<Response> {
   });
 
   const job = await prisma.analysisJob.create({
-    data: {
-      userId: user.id,
-      source: 'lichess-study',
-      status: 'PENDING',
-      ...(flow.perfTypes ? { params: { perfTypes: flow.perfTypes } } : {}),
-    },
+    data: { userId: user.id, source: 'lichess-study', status: 'PENDING' },
   });
 
   await prisma.game.createMany({
