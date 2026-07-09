@@ -36,8 +36,12 @@ export const SignupSchema = z.object({
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
 
-/** Start the Lichess-studies OAuth import (email captured before redirect). */
-export const StudyStartSchema = z.object({ email, consent, perfTypes });
+/**
+ * Start the Lichess-studies OAuth import (email captured before redirect).
+ * No time-control filter: study/OTB games rarely carry a [TimeControl] tag, so
+ * filtering would exclude them — we import all valid chapters.
+ */
+export const StudyStartSchema = z.object({ email, consent });
 
 export const InterestSchema = z.object({
   tier: z.enum(['notify', 'monthly', 'annual']),

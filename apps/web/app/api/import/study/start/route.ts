@@ -17,6 +17,6 @@ export async function POST(req: Request): Promise<Response> {
   if (!parsed.success) {
     return jsonError(parsed.error.issues[0]?.message ?? 'Invalid input', 422);
   }
-  const url = startStudyFlow(parsed.data.email, parsed.data.perfTypes);
+  const url = startStudyFlow(parsed.data.email);
   return jsonOk({ url });
 }
