@@ -13,6 +13,18 @@ const STAGE_LABEL: Record<string, string> = {
   FAILED: 'Something went wrong.',
 };
 
+/** Map internal job errors to user-friendly messages. */
+function friendlyJobError(raw?: string): string {
+  const e = (raw ?? '').toLowerCase();
+  if (e.includes('no games')) {
+    return "We couldn't find any games to analyze. Please try again with a different selection.";
+  }
+  if (e.includes('lichess username')) {
+    return 'We couldn’t identify your chess account. Please start again from the home page.';
+  }
+  return 'Your analysis didn’t finish. Please try again in a moment.';
+}
+
 export default function AnalyzingPage({ params }: { params: { jobId: string } }) {
   const router = useRouter();
   const [status, setStatus] = useState('PENDING');
@@ -39,7 +51,8 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
           return;
         }
         if (json.data.status === 'FAILED') {
-          setError(json.data.error ?? 'Analysis failed. Please try again.');
+          // Show a friendly message; don't surface raw internal errors.
+          setError(friendlyJobError(json.data.error));
           return;
         }
         timer = setTimeout(poll, 2000);
