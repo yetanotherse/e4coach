@@ -109,10 +109,15 @@ export async function fetchAccountUsername(token: string): Promise<string> {
   return name;
 }
 
-/** Fetch a user's studies as one multi-game PGN. */
+/**
+ * Fetch a user's studies as one multi-game PGN. `orientation=true` is essential:
+ * it emits an [Orientation] tag per chapter (the board side set in the UI) — the
+ * only reliable "which side is the user" signal, since player tags carry real
+ * names for OTB imports and are absent on many chapters.
+ */
 export async function fetchStudiesPgn(token: string, username: string): Promise<string> {
   const res = await fetch(
-    `https://lichess.org/api/study/by/${encodeURIComponent(username)}/export.pgn`,
+    `https://lichess.org/api/study/by/${encodeURIComponent(username)}/export.pgn?orientation=true`,
     { headers: { Authorization: `Bearer ${token}`, Accept: 'application/x-ndjson' } },
   );
   if (!res.ok) throw new Error(`Lichess studies export failed: ${res.status}`);
