@@ -53,6 +53,17 @@ const VARIANT = `[Event "Rated Crazyhouse game"]
 
 1. e4 e5 2. Nf3 Nc6 1-0`;
 
+// An OTB import: real names (not the username), but Orientation is set → import.
+const ORIENTED_BLACK = `[Event "OTB Tournament"]
+[Site "India"]
+[White "Real Name"]
+[Black "Other Person"]
+[Result "1-0"]
+[Variant "Standard"]
+[Orientation "black"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 1-0`;
+
 const ALL = [WHITE_GAME, BLACK_GAME, NO_PLAYERS, OTHER_PLAYERS, VARIANT].join('\n\n');
 
 describe('splitChapters', () => {
@@ -108,5 +119,18 @@ describe('parseLichessStudies', () => {
       max: 100,
     });
     expect(games).toHaveLength(0);
+  });
+
+  it('uses the Orientation tag when player names do not match the username', () => {
+    // Real names (OTB import), username matches neither — Orientation drives it.
+    const { games } = parseLichessStudies(ORIENTED_BLACK, { username: 'myname', max: 100 });
+    expect(games).toHaveLength(1);
+    expect(games[0]!.userColor).toBe('black');
+  });
+
+  it('Orientation takes precedence over a username match', () => {
+    const conflict = WHITE_GAME.replace('[Result "1-0"]', '[Result "1-0"]\n[Orientation "black"]');
+    const { games } = parseLichessStudies(conflict, { username: 'myname', max: 100 });
+    expect(games[0]!.userColor).toBe('black'); // orientation wins over White="MyName"
   });
 });

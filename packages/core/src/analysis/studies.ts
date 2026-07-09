@@ -1,11 +1,13 @@
 /**
  * Lichess study export (multi-game PGN) → ImportedGame[] (spec Phase F).
  *
- * A study chapter is only importable when it is a real, played game we can
- * attribute to the user: Standard variant, a real mainline, and [White]/[Black]
- * tags where the user's Lichess username matches one side (→ userColor). There
- * is NO [Orientation] tag in the export, so player-name matching is the signal.
- * Hand-built chapters (opening trees, custom FEN, empty) are skipped.
+ * A chapter is importable when it is a Standard game with a real mainline and a
+ * determinable side to analyze. The side comes from the [Orientation] tag (the
+ * board orientation set in the Lichess UI — requires `?orientation=true` on the
+ * export), falling back to matching the user's username against [White]/[Black].
+ * Player tags carry REAL names for OTB imports (e.g. "Tavish Singh") and are
+ * absent on many chapters, so orientation is the reliable signal. Chapters with
+ * neither signal, or too few moves, are skipped.
  *
  * Pure: chess.js only, no I/O.
  */
@@ -107,11 +109,20 @@ function chapterToGame(
   const tags = parseTags(chapter);
   if ((tags.Variant ?? 'Standard') !== 'Standard') return null;
 
+  // Prefer the board orientation set in the UI; fall back to a username match.
+  const orientation = tags.Orientation?.toLowerCase();
   const lower = username.toLowerCase();
   const white = tags.White?.toLowerCase();
   const black = tags.Black?.toLowerCase();
-  const userColor: Color | null = white === lower ? 'white' : black === lower ? 'black' : null;
-  if (!userColor) return null; // can't attribute a side to the user
+  const userColor: Color | null =
+    orientation === 'white' || orientation === 'black'
+      ? (orientation as Color)
+      : white === lower
+        ? 'white'
+        : black === lower
+          ? 'black'
+          : null;
+  if (!userColor) return null; // no way to tell which side to analyze
 
   // Validate it's a real, legal game with enough moves. Study movetext has
   // annotations chess.js can't parse, so clean to the mainline first.
