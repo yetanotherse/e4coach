@@ -31,6 +31,7 @@ function alreadyLost(cpBefore: number): boolean {
 export interface FullGame {
   pgn: string;
   userColor: 'white' | 'black';
+  event?: string;
 }
 
 export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: FullGame }) {
@@ -90,6 +91,9 @@ export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: Full
       ) : null}
 
       <figcaption className="mt-2 text-sm text-neutral-600">
+        {fullGame?.event && (
+          <span className="mb-1 block text-xs font-medium text-neutral-500">{fullGame.event}</span>
+        )}
         <span className="flex flex-wrap items-center gap-2">
           <span>
             Move {ex.moveNumber}: you played <strong>{ex.playedMove}</strong>

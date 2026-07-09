@@ -127,7 +127,15 @@ export default async function ReportPage({ params }: { params: { slug: string } 
                     <MoveExample
                       key={`${ex.gameId}-${ex.ply}`}
                       ex={ex}
-                      {...(g ? { fullGame: { pgn: g.pgn, userColor: g.userColor } } : {})}
+                      {...(g
+                        ? {
+                            fullGame: {
+                              pgn: g.pgn,
+                              userColor: g.userColor,
+                              ...(g.event ? { event: g.event } : {}),
+                            },
+                          }
+                        : {})}
                     />
                   );
                 })}

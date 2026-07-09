@@ -83,6 +83,33 @@ describe('single-assignment de-dup', () => {
   });
 });
 
+describe('played==best safety net', () => {
+  it('drops examples where the played move equals the engine best move', () => {
+    const ctx: GameContext = {
+      game: makeGame({ id: 'g1' }),
+      // A hanging-piece blunder whose played UCI == the engine best move.
+      moves: [
+        moveWith('blunder', {
+          ply: 10,
+          userMaterialLossNextPly: 4,
+          cpl: 300,
+          cpBefore: 0,
+          uci: 'e2e4',
+          bestMove: 'e2e4',
+        }),
+      ],
+    };
+    const profile = aggregateProfile({
+      username: 'u',
+      source: 'mock',
+      contexts: [ctx],
+      movesScored: 1,
+      engineMeta,
+    });
+    expect(profile.categories).toHaveLength(0); // nothing surfaced
+  });
+});
+
 describe('example selection', () => {
   it('honors maxExamples and spreads across distinct games', () => {
     const contexts: GameContext[] = Array.from({ length: 6 }, (_, i) => ({

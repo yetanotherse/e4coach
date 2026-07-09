@@ -29,7 +29,9 @@ export const DECIDED_CP = 600;
 /** Normalize an EngineEval (side-to-move POV) to a bounded centipawn number. */
 export function cpFromEval(e: EngineEval): number {
   if (typeof e.mate === 'number') {
-    const sign = e.mate === 0 ? 1 : Math.sign(e.mate);
+    // mate > 0: side-to-move mates (win). mate <= 0: side-to-move is mated,
+    // incl. mate 0 = already checkmated (a loss).
+    const sign = e.mate > 0 ? 1 : -1;
     return sign * CP_CLAMP;
   }
   return clamp(e.cp ?? 0, -CP_CLAMP, CP_CLAMP);

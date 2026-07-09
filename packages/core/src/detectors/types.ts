@@ -61,7 +61,7 @@ export function toErrorInstance(
     cpAfter: move.cpAfter,
     assessment,
     userColor: ctx.game.userColor,
-    ...(ctx.plies ? { line: buildLine(ctx.plies, move.ply) } : {}),
+    ...(ctx.plies && ctx.plies.length > 0 ? { line: buildLine(ctx.plies, move.ply) } : {}),
     note,
   };
 }

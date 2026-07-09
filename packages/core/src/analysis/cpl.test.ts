@@ -21,6 +21,8 @@ describe('cpFromEval', () => {
   it('maps mate to a large signed value', () => {
     expect(cpFromEval({ mate: 3, bestMove: 'a', pv: [], depth: 1 })).toBeGreaterThan(1000);
     expect(cpFromEval({ mate: -2, bestMove: 'a', pv: [], depth: 1 })).toBeLessThan(-1000);
+    // mate 0 = the side to move is already checkmated → a loss (negative).
+    expect(cpFromEval({ mate: 0, bestMove: 'a', pv: [], depth: 1 })).toBeLessThan(-1000);
   });
   it('clamps extreme cp values', () => {
     expect(cpFromEval({ cp: 999999, bestMove: 'a', pv: [], depth: 1 })).toBe(2000);

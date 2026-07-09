@@ -75,6 +75,13 @@ describe('failedConversionDetector', () => {
     expect(found).toHaveLength(1);
     expect(found[0]!.cpl).toBe(0); // cites the peak position
   });
+  it('does NOT flag an unfinished study game (result "*")', () => {
+    const ctx = {
+      game: makeGame({ result: '*', userColor: 'white' }),
+      moves: [makeMove({ cpBefore: 350 })],
+    };
+    expect(failedConversionDetector.detect(ctx)).toHaveLength(0);
+  });
   it('does not flag when the user won', () => {
     const ctx = {
       game: makeGame({ result: '1-0', userColor: 'white' }),

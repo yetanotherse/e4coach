@@ -34,7 +34,7 @@ export function makeMove(overrides: Partial<DetectorMove> = {}): DetectorMove {
     cpBefore: 0,
     cpAfter: 0,
     cpl: 0,
-    bestMove: 'e2e4',
+    bestMove: 'd2d4', // differs from the played e2e4/e4 (avoids the played==best net)
     phase: 'middlegame',
     isCapture: false,
     isCheck: false,
