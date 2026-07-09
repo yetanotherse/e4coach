@@ -12,6 +12,7 @@ import {
   type AnalysisScope,
   type Analytics,
   type ChessEngine,
+  type EmbeddedGame,
   type GameContext,
   type GameSource,
   type ImportedGame,
@@ -254,16 +255,22 @@ async function loadStoredGames(
 function collectReferencedGames(
   profile: WeaknessProfile,
   games: ImportedGame[],
-): Record<string, { pgn: string; userColor: 'white' | 'black'; white: string; black: string }> {
+): Record<string, EmbeddedGame> {
   const byId = new Map(games.map((g) => [g.id, g]));
-  const out: Record<string, { pgn: string; userColor: 'white' | 'black'; white: string; black: string }> =
-    {};
+  const out: Record<string, EmbeddedGame> = {};
   for (const cat of profile.topWeaknesses) {
     const stat = profile.categories.find((c) => c.category === cat);
     for (const ex of stat?.examples ?? []) {
       const g = byId.get(ex.gameId);
       if (g && !out[ex.gameId]) {
-        out[ex.gameId] = { pgn: g.pgn, userColor: g.userColor, white: g.white, black: g.black };
+        const event = g.pgn.match(/\[Event\s+"([^"]*)"\]/)?.[1];
+        out[ex.gameId] = {
+          pgn: g.pgn,
+          userColor: g.userColor,
+          white: g.white,
+          black: g.black,
+          ...(event && event !== '?' ? { event } : {}),
+        };
       }
     }
   }

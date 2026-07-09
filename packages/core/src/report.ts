@@ -23,6 +23,7 @@ export interface EmbeddedGame {
   userColor: 'white' | 'black';
   white: string;
   black: string;
+  event?: string; // [Event] tag, to help the user recall the game
 }
 
 export interface ReportContent {

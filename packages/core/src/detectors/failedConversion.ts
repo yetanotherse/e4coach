@@ -11,15 +11,22 @@ export function userWon(game: ImportedGame): boolean {
   return false;
 }
 
+/** Only decisive/drawn results tell us the game's outcome. '*' (study analysis
+ * boards) is unknown — we can't judge a conversion failure. */
+function hasKnownResult(game: ImportedGame): boolean {
+  return game.result === '1-0' || game.result === '0-1' || game.result === '1/2-1/2';
+}
+
 /**
  * FAILED_CONVERSION — the user reached a clearly winning position (eval ≥ +2.0)
  * but did not win the game (spec §9.2). One instance per game, citing the peak
  * position, so this reflects a game-level pattern rather than a single move.
+ * Requires a known result — unfinished study chapters ('*') are skipped.
  */
 export const failedConversionDetector: Detector = {
   category: 'FAILED_CONVERSION',
   detect(ctx: GameContext): ErrorInstance[] {
-    if (userWon(ctx.game) || ctx.moves.length === 0) return [];
+    if (!hasKnownResult(ctx.game) || userWon(ctx.game) || ctx.moves.length === 0) return [];
     let peak: DetectorMove | undefined;
     for (const move of ctx.moves) {
       if (move.cpBefore >= WINNING_CP && (!peak || move.cpBefore > peak.cpBefore)) {

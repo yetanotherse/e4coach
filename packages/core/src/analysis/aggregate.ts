@@ -6,7 +6,7 @@ import type { WeaknessProfile, WeaknessCategoryStat, ErrorInstance } from '../pr
 import type { WeaknessCategory } from '../taxonomy.js';
 import { WEAKNESS_CATEGORIES } from '../taxonomy.js';
 import { ALL_DETECTORS, type GameContext } from '../detectors/index.js';
-import { clamp } from './cpl.js';
+import { clamp, normalizeUci } from './cpl.js';
 
 const LOW_CONFIDENCE_GAMES = 10; // spec §9.3
 const DEFAULT_MAX_EXAMPLES = 10;
@@ -55,6 +55,14 @@ export function aggregateProfile(input: AggregateInput): WeaknessProfile {
   for (const ctx of input.contexts) {
     for (const detector of ALL_DETECTORS) {
       for (const instance of detector.detect(ctx)) {
+        // Safety net: never surface an example where the played move IS the
+        // engine's move ("you played X — better was X"). Not instructive.
+        const sameSan =
+          instance.betterMoveSan !== undefined && instance.betterMoveSan === instance.playedMove;
+        const sameUci =
+          instance.playedMoveUci !== undefined &&
+          normalizeUci(instance.playedMoveUci) === normalizeUci(instance.betterMove);
+        if (sameSan || sameUci) continue;
         byCategory.get(instance.category)!.push(instance);
       }
     }
