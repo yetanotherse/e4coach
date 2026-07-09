@@ -26,6 +26,13 @@ export const SignupSchema = z.object({
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
 
+/** Start the Lichess-studies OAuth import (email captured before redirect). */
+export const StudyStartSchema = z.object({
+  email: z.string().trim().email().max(254),
+  consent: z.literal(true, { errorMap: () => ({ message: 'Consent is required' }) }),
+  perfTypes: JobParamsSchema.shape.perfTypes,
+});
+
 export const InterestSchema = z.object({
   tier: z.enum(['notify', 'monthly', 'annual']),
   reportSlug: z.string().max(64).optional(),

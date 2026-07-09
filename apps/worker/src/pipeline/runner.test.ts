@@ -15,7 +15,7 @@ import { runJob, type RunDeps } from './runner.js';
  * runner makes. Lets us exercise the full pipeline (parse → evaluate → classify
  * → aggregate → generate → persist) with zero infrastructure.
  */
-function fakeDb() {
+function fakeDb(gameRows: Array<Record<string, unknown>> = []) {
   const state = {
     jobUpdates: [] as Array<Record<string, unknown>>,
     reports: [] as Array<Record<string, unknown>>,
@@ -33,6 +33,9 @@ function fakeDb() {
         return data;
       },
     },
+    game: {
+      findMany: async () => gameRows,
+    },
   } as unknown as PrismaClient;
   return { db, state };
 }
@@ -47,6 +50,7 @@ function makeDeps(db: PrismaClient, over: Partial<RunDeps> = {}): RunDeps {
     mailer: new MockMailer(),
     appUrl: 'http://localhost:3000',
     maxGames: 20,
+    maxAnalyzed: 100,
     maxExamples: 10,
     movetimeMs: 150,
     ...over,
@@ -100,5 +104,28 @@ describe('runJob (full pipeline on mocks)', () => {
     const last = state.jobUpdates[state.jobUpdates.length - 1]!;
     expect(last.status).toBe('FAILED');
     expect(analytics.events.some((e) => e.event === 'job_failed')).toBe(true);
+  });
+
+  it('study source loads pre-stored games and embeds referenced PGNs', async () => {
+    const gameRow = {
+      externalId: 'study1',
+      pgn: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4 Bxb4 5. c3 Ba5 6. d4 exd4 7. O-O',
+      white: 'mockuser',
+      black: 'opp',
+      userColor: 'white',
+      result: '*',
+      timeControl: '60+0',
+      speed: 'bullet',
+      playedAt: new Date('2026-06-01T00:00:00Z'),
+    };
+    const { db, state } = fakeDb([gameRow]);
+    const studyJob = { id: 'j2', userId: 'u1', source: 'lichess-study' };
+    const slug = await runJob(studyJob, user, makeDeps(db));
+
+    expect(slug).toBeTruthy();
+    const report = state.reports[0]!;
+    const content = report.content as { games?: Record<string, unknown> };
+    // Referenced games are embedded for the in-app stepper when any example fired.
+    expect(content.games).toBeDefined();
   });
 });

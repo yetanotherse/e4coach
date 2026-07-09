@@ -35,6 +35,8 @@ export interface RunDeps {
   appUrl: string;
   /** hard ceiling on games per job (bounds cost, spec §17) */
   maxGames: number;
+  /** cap on games analyzed for pre-stored sources (studies/PGN) */
+  maxAnalyzed: number;
   maxExamples: number;
   movetimeMs: number;
 }
@@ -73,16 +75,26 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
   try {
     if (!user.lichessUser) throw new Error('user has no lichess username');
 
-    // ── Stage 1: fetch ──────────────────────────────────────────────
-    // Honor the user's chosen count/time-controls, hard-capped to bound cost.
-    const requestedMax = Math.min(job.params?.maxGames ?? deps.maxGames, deps.maxGames);
-    const perfTypes = job.params?.perfTypes?.length ? job.params.perfTypes : DEFAULT_PERF_TYPES;
-    await setStage(db, job.id, 'FETCHING', 'fetching games');
-    const games = await deps.gameSource.fetchRecentGames(user.lichessUser, {
-      max: requestedMax,
-      rated: true,
-      perfTypes,
-    });
+    // ── Stage 1: obtain games ───────────────────────────────────────
+    // Pre-stored sources (studies) load from the DB; live sources fetch.
+    await setStage(db, job.id, 'FETCHING', 'gathering games');
+    let games: ImportedGame[];
+    let requestedMax: number;
+    let perfTypes: string[];
+    if (job.source === 'lichess-study') {
+      games = await loadStoredGames(db, job.id, deps.maxAnalyzed);
+      requestedMax = deps.maxAnalyzed;
+      perfTypes = job.params?.perfTypes?.length ? job.params.perfTypes : [];
+    } else {
+      requestedMax = Math.min(job.params?.maxGames ?? deps.maxGames, deps.maxGames);
+      perfTypes = job.params?.perfTypes?.length ? job.params.perfTypes : DEFAULT_PERF_TYPES;
+      games = await deps.gameSource.fetchRecentGames(user.lichessUser, {
+        max: requestedMax,
+        rated: true,
+        perfTypes,
+      });
+    }
+    if (games.length === 0) throw new Error('no games to analyze');
     await db.analysisJob.update({ where: { id: job.id }, data: { gameCount: games.length } });
 
     // ── Stages 2-4: parse → evaluate → classify (per game, isolated) ─
@@ -104,6 +116,11 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     // ── Stage 5: generate report ────────────────────────────────────
     await setStage(db, job.id, 'GENERATING', 'writing your report');
     const content = await generateReport(profile, deps.llm);
+    // Embed the games cited by examples so the in-app stepper works without
+    // auth (study source only; live sources deep-link out instead).
+    if (job.source === 'lichess-study') {
+      content.games = collectReferencedGames(profile, games);
+    }
 
     // ── Stage 6: persist ────────────────────────────────────────────
     const slug = generateSlug();
@@ -207,6 +224,50 @@ function buildScope(
     timeControls,
     ...(dates.length ? { dateFrom: dates[0], dateTo: dates[dates.length - 1] } : {}),
   };
+}
+
+/** Load pre-imported games (study/PGN sources) from the DB as ImportedGames. */
+async function loadStoredGames(
+  db: PrismaClient,
+  jobId: string,
+  cap: number,
+): Promise<ImportedGame[]> {
+  const rows = await db.game.findMany({
+    where: { jobId },
+    orderBy: { playedAt: 'desc' },
+    take: cap,
+  });
+  return rows.map((r) => ({
+    id: r.externalId,
+    pgn: r.pgn,
+    white: r.white,
+    black: r.black,
+    userColor: r.userColor === 'black' ? 'black' : 'white',
+    result: r.result,
+    timeControl: r.timeControl,
+    ...(r.speed ? { speed: r.speed } : {}),
+    playedAt: r.playedAt.toISOString(),
+  }));
+}
+
+/** Games cited by the top-weakness examples, keyed by id, for the in-app stepper. */
+function collectReferencedGames(
+  profile: WeaknessProfile,
+  games: ImportedGame[],
+): Record<string, { pgn: string; userColor: 'white' | 'black'; white: string; black: string }> {
+  const byId = new Map(games.map((g) => [g.id, g]));
+  const out: Record<string, { pgn: string; userColor: 'white' | 'black'; white: string; black: string }> =
+    {};
+  for (const cat of profile.topWeaknesses) {
+    const stat = profile.categories.find((c) => c.category === cat);
+    for (const ex of stat?.examples ?? []) {
+      const g = byId.get(ex.gameId);
+      if (g && !out[ex.gameId]) {
+        out[ex.gameId] = { pgn: g.pgn, userColor: g.userColor, white: g.white, black: g.black };
+      }
+    }
+  }
+  return out;
 }
 
 type Stage =

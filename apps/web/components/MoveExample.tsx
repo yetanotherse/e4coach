@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChessBoard } from './ChessBoard';
+import { GameViewer } from './GameViewer';
 
 /** Shape of an ErrorInstance example (subset the UI needs). */
 export interface ExampleData {
@@ -26,7 +27,13 @@ function alreadyLost(cpBefore: number): boolean {
   return cpBefore <= -300;
 }
 
-export function MoveExample({ ex }: { ex: ExampleData }) {
+/** Optional full game for the in-app stepper (study imports). */
+export interface FullGame {
+  pgn: string;
+  userColor: 'white' | 'black';
+}
+
+export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: FullGame }) {
   const [stepping, setStepping] = useState(false);
   const [idx, setIdx] = useState(ex.line?.focusIndex ?? 0);
 
@@ -34,18 +41,30 @@ export function MoveExample({ ex }: { ex: ExampleData }) {
   const atFocus = !stepping || !line || idx === line.focusIndex;
   const boardFen = stepping && line ? line.fens[idx]! : ex.fen;
 
+  const showFullGame = Boolean(fullGame) && stepping;
+
   return (
     <figure className="rounded-lg border border-neutral-200 p-3">
-      <div className="mx-auto max-w-[260px]">
-        <ChessBoard
-          fen={boardFen}
-          orientation={ex.userColor}
-          playedUci={atFocus ? ex.playedMoveUci : undefined}
-          betterUci={atFocus ? ex.betterMove : undefined}
+      {showFullGame && fullGame ? (
+        <GameViewer
+          pgn={fullGame.pgn}
+          userColor={fullGame.userColor}
+          focusPly={ex.ply}
+          playedUci={ex.playedMoveUci}
+          betterUci={ex.betterMove}
         />
-      </div>
+      ) : (
+        <div className="mx-auto max-w-[260px]">
+          <ChessBoard
+            fen={boardFen}
+            orientation={ex.userColor}
+            playedUci={atFocus ? ex.playedMoveUci : undefined}
+            betterUci={atFocus ? ex.betterMove : undefined}
+          />
+        </div>
+      )}
 
-      {stepping && line ? (
+      {stepping && line && !fullGame ? (
         <div className="mt-2 flex items-center justify-center gap-3 text-sm print:hidden">
           <button
             onClick={() => setIdx((i) => Math.max(0, i - 1))}
@@ -97,18 +116,24 @@ export function MoveExample({ ex }: { ex: ExampleData }) {
           </span>
         </span>
         <span className="mt-1 flex gap-3">
-          {line && (
+          {(fullGame || line) && (
             <button
               onClick={() => {
                 setStepping((s) => !s);
-                setIdx(line.focusIndex);
+                if (line) setIdx(line.focusIndex);
               }}
               className="text-brand underline print:hidden"
             >
-              {stepping ? 'Hide moves' : 'Step through'}
+              {stepping
+                ? fullGame
+                  ? 'Hide game'
+                  : 'Hide moves'
+                : fullGame
+                  ? 'Replay full game'
+                  : 'Step through'}
             </button>
           )}
-          {ex.gameUrl && (
+          {ex.gameUrl && !fullGame && (
             <a href={ex.gameUrl} target="_blank" rel="noopener noreferrer" className="text-brand underline">
               View on Lichess
             </a>
