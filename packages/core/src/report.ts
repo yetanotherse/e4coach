@@ -17,6 +17,14 @@ export interface ReportWeaknessSection {
   examples: ErrorInstance[];
 }
 
+/** A game embedded in the report so the in-app stepper works without auth. */
+export interface EmbeddedGame {
+  pgn: string; // mainline PGN
+  userColor: 'white' | 'black';
+  white: string;
+  black: string;
+}
+
 export interface ReportContent {
   headline: string; // LLM: friendly one-liner summary
   intro: string; // LLM: 1-2 sentence framing
@@ -24,4 +32,6 @@ export interface ReportContent {
   confidenceNote?: string; // present when profile.lowConfidence
   /** true when produced by the template fallback (LLM unavailable) — spec §11.4 */
   degraded: boolean;
+  /** games referenced by examples, keyed by gameId — for the in-app full stepper */
+  games?: Record<string, EmbeddedGame>;
 }

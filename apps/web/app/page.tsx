@@ -1,4 +1,4 @@
-import { SignupForm } from '@/components/SignupForm';
+import { ImportPanel } from '@/components/ImportPanel';
 import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
 
@@ -8,7 +8,11 @@ const STEPS = [
   { title: 'You get a clear plan', body: 'Your top 3 weaknesses, in plain language, with your own positions.' },
 ];
 
-export default function LandingPage() {
+export default function LandingPage({
+  searchParams,
+}: {
+  searchParams: { studyError?: string };
+}) {
   return (
     <main className="mx-auto max-w-5xl px-6 py-16">
       <PageView event="landing_view" />
@@ -38,7 +42,7 @@ export default function LandingPage() {
         </div>
 
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
-          <SignupForm />
+          <ImportPanel {...(searchParams.studyError ? { studyError: searchParams.studyError } : {})} />
         </div>
       </section>
 

@@ -29,7 +29,7 @@ model AnalysisJob {
   id         String    @id @default(cuid())
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  source     String // 'lichess' | 'chesscom'
+  source     String // 'lichess' | 'lichess-study' | 'chesscom'
   status     JobStatus @default(PENDING)
   stage      String? // fine-grained progress for the UI
   gameCount  Int       @default(0)
@@ -41,9 +41,31 @@ model AnalysisJob {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   report     Report?
+  games      Game[] // pre-stored games (study/PGN sources); empty for live-fetch
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+// Pre-imported games for sources that aren't live-fetched at analysis time
+// (Lichess studies, later PGN upload). Live sources (lichess/mock) don't use this.
+model Game {
+  id          String      @id @default(cuid())
+  jobId       String
+  job         AnalysisJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  externalId  String // source game id (Lichess game id or study/chapter id)
+  pgn         String // mainline PGN (analysis + in-app stepper)
+  white       String
+  black       String
+  userColor   String // 'white' | 'black'
+  result      String
+  timeControl String
+  speed       String?
+  gameUrl     String?
+  playedAt    DateTime
+  createdAt   DateTime    @default(now())
+
+  @@index([jobId])
 }
 
 model Report {

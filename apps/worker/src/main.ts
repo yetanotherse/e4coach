@@ -25,6 +25,7 @@ async function main(): Promise<void> {
     mailer: createMailer(env),
     appUrl: env.APP_URL,
     maxGames: env.MAX_GAMES_PER_JOB,
+    maxAnalyzed: env.MAX_ANALYZED_GAMES,
     maxExamples: env.MAX_EXAMPLES_PER_WEAKNESS,
     movetimeMs: env.ENGINE_MOVETIME_MS,
   };

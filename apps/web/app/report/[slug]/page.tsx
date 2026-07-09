@@ -121,9 +121,16 @@ export default async function ReportPage({ params }: { params: { slug: string } 
 
             {w.examples.length > 0 && (
               <div className="mt-5 grid gap-6 sm:grid-cols-2">
-                {w.examples.map((ex) => (
-                  <MoveExample key={`${ex.gameId}-${ex.ply}`} ex={ex} />
-                ))}
+                {w.examples.map((ex) => {
+                  const g = content.games?.[ex.gameId];
+                  return (
+                    <MoveExample
+                      key={`${ex.gameId}-${ex.ply}`}
+                      ex={ex}
+                      {...(g ? { fullGame: { pgn: g.pgn, userColor: g.userColor } } : {})}
+                    />
+                  );
+                })}
               </div>
             )}
           </section>
