@@ -201,6 +201,13 @@ docker compose logs -f
 docker compose pull; docker compose up -d --build   # redeploy
 ```
 
+> After editing `worker.env`, run `docker compose up -d` (or `--build`) to
+> recreate the container — `docker compose restart` / `docker restart` reuse the
+> old environment and will **not** pick up the new values. `APP_URL` in
+> particular must be your public web URL: it's baked into every report email
+> link, and a missing value falls back to `http://localhost:3000`. The worker
+> logs its `appUrl` at boot and warns if it's still localhost in production.
+
 ## 4. Smoke-check production
 
 - Sign up on the landing page with a real Lichess username.
