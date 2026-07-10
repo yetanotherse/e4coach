@@ -5,7 +5,7 @@ Two deployables + one database (spec §5, §14.15):
 | Piece | Host | Notes |
 |---|---|---|
 | **Web** (`apps/web`) | Vercel | Next.js 14 app: landing, auth, report, API routes |
-| **Worker** (`apps/worker`) | Render / Fly.io | Always-on Node process, native Stockfish, poll loop |
+| **Worker** (`apps/worker`) | Render / Fly.io / **your own server** | Always-on Node process, native Stockfish, poll loop |
 | **Postgres** | Supabase (or Neon) | Prisma schema; run migrations before first deploy |
 
 Everything is behind adapters selected by env, so flip a provider by changing one variable.
@@ -52,6 +52,138 @@ sudo apt-get update && sudo apt-get install -y stockfish   # → /usr/games/stoc
 ```
 
 Or Fly.io: `fly launch` with the same Dockerfile; set secrets via `fly secrets set`.
+
+## 3b. Worker → your own Ubuntu server (Docker)
+
+The worker is a **headless poll loop, not a web service**. It opens no port and needs no
+inbound URL, domain, or Apache reverse proxy — it connects **directly to Postgres**
+(`DATABASE_URL`), claims the oldest `PENDING` job, and processes it. All its network traffic is
+*outbound* (Postgres, Lichess, Gemini, Resend, PostHog). `APP_URL` is only used to build report
+links inside the "report ready" email, so point it at your **Vercel web URL**, not the server.
+
+So Apache2 stays dedicated to whatever else you host — the worker just needs Docker + outbound
+internet. You can run more than one container (or more than one server) safely: the guarded
+`updateMany` claim in `poller.ts` stops two workers from grabbing the same job.
+
+### 1. Prerequisites (once per server)
+
+```bash
+# Docker Engine (skip if already installed — you said the docker service is running)
+sudo apt-get update && sudo apt-get install -y docker.io git
+sudo systemctl enable --now docker
+sudo usermod -aG docker "$USER"   # log out/in so you can run docker without sudo
+```
+
+### 2. Get the code onto the server
+
+```bash
+git clone <your-repo-url> chessapp && cd chessapp
+# on later deploys: cd chessapp && git pull
+```
+
+### 3. Create the env file (CLI, no dashboard needed)
+
+The container reads its config from a `.env` file you pass with `--env-file`. Create it **outside
+git** on the server (e.g. `/opt/chessapp/worker.env`) and lock down its permissions — it holds
+secrets:
+
+```bash
+sudo mkdir -p /opt/chessapp
+sudo tee /opt/chessapp/worker.env >/dev/null <<'EOF'
+# --- connection (direct to Postgres; use the pooled URL for the app runtime) ---
+DATABASE_URL=postgres://...      # Supabase/Neon pooled URL
+DIRECT_URL=postgres://...        # direct URL (migrations)
+APP_URL=https://your-app.vercel.app   # web URL, used only for email report links
+
+# --- providers ---
+GAME_SOURCE=lichess
+ENGINE_KIND=native
+STOCKFISH_PATH=/usr/games/stockfish
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-2.5-flash
+GEMINI_API_KEY=...
+ANALYTICS_PROVIDER=posthog
+POSTHOG_KEY=...
+POSTHOG_HOST=https://us.i.posthog.com
+MAILER_PROVIDER=resend
+RESEND_API_KEY=...
+EMAIL_FROM="Chess Coach <coach@yourdomain.com>"
+LICHESS_USER_AGENT=ChessCoach/1.0 (you@example.com)
+
+# --- tuning (optional; these are the render.yaml defaults) ---
+MAX_GAMES_PER_JOB=20
+ENGINE_MOVETIME_MS=150
+WORKER_POLL_INTERVAL_MS=2000
+NODE_ENV=production
+EOF
+sudo chmod 600 /opt/chessapp/worker.env
+```
+
+> `ENGINE_KIND`, `STOCKFISH_PATH`, and the provider names are already baked into the Dockerfile,
+> but keeping them in the env file makes the container's config explicit and easy to override.
+
+### 4. Build the image (build context = repo root)
+
+```bash
+docker build -f apps/worker/Dockerfile -t chess-coach-worker .
+```
+
+### 5. Run migrations once (if not already applied from elsewhere)
+
+```bash
+docker run --rm --env-file /opt/chessapp/worker.env chess-coach-worker \
+  pnpm --filter @chess-coach/db exec prisma migrate deploy
+```
+
+### 6. Run the worker as a long-lived, auto-restarting container
+
+```bash
+docker run -d \
+  --name chess-coach-worker \
+  --env-file /opt/chessapp/worker.env \
+  --restart unless-stopped \
+  chess-coach-worker
+```
+
+`--restart unless-stopped` brings it back after crashes and server reboots (works with the
+Docker service you already have enabled). Manage it with:
+
+```bash
+docker logs -f chess-coach-worker      # follow the FETCHING → … → DONE loop
+docker restart chess-coach-worker
+docker stop chess-coach-worker && docker rm chess-coach-worker
+```
+
+### 7. Redeploying a new version
+
+```bash
+cd chessapp && git pull
+docker build -f apps/worker/Dockerfile -t chess-coach-worker .
+docker stop chess-coach-worker && docker rm chess-coach-worker
+docker run -d --name chess-coach-worker --env-file /opt/chessapp/worker.env \
+  --restart unless-stopped chess-coach-worker
+```
+
+### Optional: docker compose (nicer for edits + boot persistence)
+
+Put this at `/opt/chessapp/docker-compose.yml` so config lives in one file:
+
+```yaml
+services:
+  worker:
+    build:
+      context: .                      # run compose from the repo root
+      dockerfile: apps/worker/Dockerfile
+    image: chess-coach-worker
+    env_file: /opt/chessapp/worker.env
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d --build     # build + start (from the repo root)
+docker compose logs -f
+docker compose pull; docker compose up -d --build   # redeploy
+```
 
 ## 4. Smoke-check production
 
