@@ -71,7 +71,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
       <PageView event="report_viewed" props={{ slug: params.slug, is_return: isReturn }} />
 
       <div className="mb-8 print:hidden">
-        <BrandLogo height={28} />
+        <BrandLogo height={40} />
       </div>
 
       <header className="flex items-start justify-between gap-4">

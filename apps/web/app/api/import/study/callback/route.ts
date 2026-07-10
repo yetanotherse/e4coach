@@ -10,8 +10,15 @@ import {
 
 const IMPORT_CEILING = 1000; // parse ceiling; worker analyzes up to MAX_ANALYZED_GAMES
 
+/**
+ * Redirect through the handoff page rather than straight to the destination:
+ * the callback runs in the auth tab, and the handoff page bounces the result
+ * back to the still-open app tab (or navigates in place if the flow was
+ * same-tab), then closes the throwaway auth tab.
+ */
 function redirect(path: string): Response {
-  return Response.redirect(`${env.APP_URL}${path}`, 303);
+  const to = `/import/handoff?to=${encodeURIComponent(path)}`;
+  return Response.redirect(`${env.APP_URL}${to}`, 303);
 }
 
 /**
