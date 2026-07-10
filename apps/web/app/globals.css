@@ -84,3 +84,47 @@ h3 {
 .cg-wrap cg-board square.selected {
   background: var(--board-move);
 }
+
+/* Coordinates inside the board corners (Chessground's default offsets assume a
+   padded wrapper we don't use, which pushed them outside the board). */
+.cg-wrap coords {
+  position: absolute;
+  display: flex;
+  pointer-events: none;
+  opacity: 0.85;
+  font-family: var(--font-body), sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  color: #1f2460; /* indigo-900 — readable on both board colors */
+}
+.cg-wrap coords.ranks {
+  inset: 0 auto 0 0;
+  width: 100%;
+  height: 100%;
+  flex-flow: column-reverse;
+}
+.cg-wrap coords.ranks.black {
+  flex-flow: column;
+}
+.cg-wrap coords.ranks coord {
+  flex: 1 1 auto;
+  align-self: flex-start;
+  transform: none;
+  padding: 2px 0 0 3px;
+}
+.cg-wrap coords.files {
+  inset: auto 0 0 0;
+  width: 100%;
+  height: 100%;
+  flex-flow: row;
+  align-items: flex-end;
+  text-transform: uppercase;
+}
+.cg-wrap coords.files.black {
+  flex-flow: row-reverse;
+}
+.cg-wrap coords.files coord {
+  flex: 1 1 auto;
+  text-align: right;
+  padding: 0 3px 1px 0;
+}
