@@ -3,6 +3,10 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/client"
+  // "native" covers local dev; "rhel-openssl-3.0.x" is Vercel's Lambda runtime
+  // (and AWS Lambda generally). Both engines are emitted so the deployed bundle
+  // has a matching query engine.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
