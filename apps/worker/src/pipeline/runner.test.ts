@@ -52,6 +52,7 @@ function makeDeps(db: PrismaClient, over: Partial<RunDeps> = {}): RunDeps {
     maxGames: 20,
     maxAnalyzed: 100,
     maxExamples: 10,
+    depth: 12,
     movetimeMs: 150,
     ...over,
   };

@@ -26,6 +26,9 @@ const EnvSchema = z.object({
   // Engine
   ENGINE_KIND: z.enum(['mock', 'native', 'wasm']).default('mock'),
   STOCKFISH_PATH: z.string().optional(),
+  // Fixed search depth → deterministic, reproducible analysis. This is the
+  // primary knob. ENGINE_MOVETIME_MS is a non-deterministic time-budget fallback.
+  ENGINE_DEPTH: z.coerce.number().int().min(6).max(30).default(12),
   ENGINE_MOVETIME_MS: z.coerce.number().int().positive().default(150),
 
   // Game source

@@ -39,6 +39,8 @@ export interface RunDeps {
   /** cap on games analyzed for pre-stored sources (studies/PGN) */
   maxAnalyzed: number;
   maxExamples: number;
+  /** fixed search depth — deterministic analysis (preferred over movetime) */
+  depth: number;
   movetimeMs: number;
 }
 
@@ -70,7 +72,7 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
   const distinctId = user.emailHash ?? user.id;
   const engineMeta: WeaknessProfile['engineMeta'] = {
     kind: deps.engine.name,
-    movetimeMs: deps.movetimeMs,
+    depth: deps.depth,
   };
 
   try {
@@ -188,7 +190,7 @@ async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<Analy
     try {
       const parsed = parseGame(game);
       const { lookup, evalCount: n } = await evaluateGame(game, parsed, deps.engine, {
-        movetimeMs: deps.movetimeMs,
+        depth: deps.depth,
       });
       evalCount += n;
       const moves = scoreUserMoves(parsed, lookup);
@@ -235,7 +237,9 @@ async function loadStoredGames(
 ): Promise<ImportedGame[]> {
   const rows = await db.game.findMany({
     where: { jobId },
-    orderBy: { playedAt: 'desc' },
+    // Stable ordering so the analyzed subset is identical every run even when
+    // many games share a date (common for OTB study imports) and count > cap.
+    orderBy: [{ playedAt: 'desc' }, { externalId: 'asc' }, { id: 'asc' }],
     take: cap,
   });
   return rows.map((r) => ({

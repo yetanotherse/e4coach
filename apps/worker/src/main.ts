@@ -27,6 +27,7 @@ async function main(): Promise<void> {
     maxGames: env.MAX_GAMES_PER_JOB,
     maxAnalyzed: env.MAX_ANALYZED_GAMES,
     maxExamples: env.MAX_EXAMPLES_PER_WEAKNESS,
+    depth: env.ENGINE_DEPTH,
     movetimeMs: env.ENGINE_MOVETIME_MS,
   };
 

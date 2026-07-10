@@ -31,7 +31,8 @@ export async function generateReport(
     const result = await llm.generate(buildReportMessages(profile), {
       responseFormat: 'json',
       jsonSchema: REPORT_JSON_SCHEMA,
-      temperature: 0.4,
+      // temperature 0 → stable wording for identical inputs (spec §9.3).
+      temperature: 0,
       metadata: { username: profile.username, source: profile.source },
     });
     const parsed = LlmReportSchema.safeParse(result.parsed ?? safeJson(result.text));
