@@ -20,6 +20,15 @@ const nextConfig = {
   experimental: {
     // Prisma client must stay external to the server bundle.
     serverComponentsExternalPackages: ['@prisma/client', '.prisma/client'],
+    // Monorepo: trace files from the repo root, not just apps/web.
+    outputFileTracingRoot: resolve(here, '../../'),
+    // The Prisma query engine (*.so.node) is loaded at runtime via a computed
+    // path, so static tracing misses it and Vercel's Lambda can't find it
+    // ("Query Engine for runtime rhel-openssl-3.0.x not found"). Force-include
+    // the generated client (engines included) next to every API route bundle.
+    outputFileTracingIncludes: {
+      '/api/**/*': ['../../packages/db/generated/client/**/*'],
+    },
   },
   webpack: (config) => {
     // Workspace packages ship raw TS with explicit .js import specifiers
