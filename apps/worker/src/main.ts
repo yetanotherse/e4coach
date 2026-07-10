@@ -11,7 +11,18 @@ import {
   createLlmProvider,
   createMailer,
 } from '@chess-coach/adapters';
+import { prisma } from '@chess-coach/db';
 import { runPollLoop } from './pipeline/poller.js';
+
+/** Host (and db name) of a Postgres URL, with credentials stripped, for logs. */
+function dbTarget(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.hostname}:${u.port || '5432'}${u.pathname}`;
+  } catch {
+    return 'unparseable';
+  }
+}
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -36,7 +47,20 @@ async function main(): Promise<void> {
     engine: deps.engine.name,
     llm: deps.llm.name,
     pollMs: env.WORKER_POLL_INTERVAL_MS,
+    db: dbTarget(env.DATABASE_URL),
   });
+
+  // Confirm the worker is pointed at the same DB the web app writes to: if this
+  // is 0 while a job is pending in the UI, the worker's DATABASE_URL is wrong.
+  try {
+    const [pending, total] = await Promise.all([
+      prisma.analysisJob.count({ where: { status: 'PENDING' } }),
+      prisma.analysisJob.count(),
+    ]);
+    console.log(`[worker] jobs at boot: ${pending} pending / ${total} total`);
+  } catch (err) {
+    console.error('[worker] DB unreachable at boot:', err instanceof Error ? err.message : err);
+  }
 
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
