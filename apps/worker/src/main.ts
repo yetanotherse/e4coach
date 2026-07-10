@@ -48,7 +48,17 @@ async function main(): Promise<void> {
     llm: deps.llm.name,
     pollMs: env.WORKER_POLL_INTERVAL_MS,
     db: dbTarget(env.DATABASE_URL),
+    appUrl: env.APP_URL,
   });
+
+  // APP_URL is baked into every report link we email. If it's still the
+  // localhost default in production, users get unreachable links — surface it
+  // loudly rather than silently sending broken emails.
+  if (env.NODE_ENV === 'production' && env.APP_URL.includes('localhost')) {
+    console.warn(
+      `[worker] WARNING: APP_URL is "${env.APP_URL}" in production — report email links will point at localhost. Set APP_URL to your public web URL.`,
+    );
+  }
 
   // Confirm the worker is pointed at the same DB the web app writes to: if this
   // is 0 while a job is pending in the UI, the worker's DATABASE_URL is wrong.
