@@ -1,5 +1,6 @@
 import { InterestSchema } from '@/lib/validation';
 import { analytics, jsonError, jsonOk, prisma } from '@/lib/server';
+import { hashEmail } from '@/lib/hash';
 
 /**
  * POST /api/interest — fake-door WTP signal (spec §13, §15). Records the click
@@ -15,14 +16,25 @@ export async function POST(req: Request): Promise<Response> {
   const parsed = InterestSchema.safeParse(body);
   if (!parsed.success) return jsonError('Invalid input', 422);
 
-  const { tier, reportSlug } = parsed.data;
-  const userId = reportSlug
-    ? (await prisma.report.findUnique({ where: { publicSlug: reportSlug }, select: { userId: true } }))
-        ?.userId
-    : undefined;
+  const { tier, reportSlug, email: formEmail } = parsed.data;
 
-  await prisma.interest.create({ data: { tier, userId: userId ?? null } });
-  await analytics.capture(userId ?? 'anonymous', 'interest_clicked', { tier });
+  // A report-page click is attributable to the signed-up user (contactable via
+  // their email); a homepage click provides its own email (the waitlist form).
+  const reportUser = reportSlug
+    ? (
+        await prisma.report.findUnique({
+          where: { publicSlug: reportSlug },
+          select: { user: { select: { id: true, email: true } } },
+        })
+      )?.user
+    : null;
+
+  const userId = reportUser?.id ?? null;
+  const email = reportUser?.email ?? formEmail ?? null;
+
+  await prisma.interest.create({ data: { tier, userId, email } });
+  const distinctId = userId ?? (email ? hashEmail(email) : 'anonymous');
+  await analytics.capture(distinctId, 'interest_clicked', { tier, hasEmail: Boolean(email) });
 
   return jsonOk({ recorded: true }, 201);
 }
