@@ -78,8 +78,8 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
           </h1>
           <p className="mt-2 text-neutral-600">{stage ?? STAGE_LABEL[status] ?? 'Working…'}</p>
           <p className="mt-8 text-xs text-neutral-400">
-            This might take a few minutes time depending on number of games and analysis needed. You
-            can safely leave — we&apos;ll email your report when it&apos;s ready.
+            This might take a few minutes depending on number of games and analysis needed. You can
+            safely leave — we&apos;ll email your report when it&apos;s ready.
           </p>
         </>
       ) : (
