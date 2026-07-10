@@ -1,4 +1,4 @@
-export const metadata = { title: 'Privacy — Chess Coach' };
+export const metadata = { title: 'Privacy — e4coach' };
 
 export default function PrivacyPage() {
   return (

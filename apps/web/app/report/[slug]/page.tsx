@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import type { AnalysisScope, ReportContent, WeaknessProfile } from '@chess-coach/core';
 import { prisma } from '@/lib/server';
 import { MoveExample } from '@/components/MoveExample';
+import { BrandLogo } from '@/components/BrandLogo';
 import { ShareBar } from '@/components/ShareBar';
 import { PrintButton } from '@/components/PrintButton';
 import { FakeDoor } from '@/components/FakeDoor';
@@ -66,8 +67,12 @@ export default async function ReportPage({ params }: { params: { slug: string } 
   const gameType = profile.scope ? gameTypeLabel(profile.scope) : null;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-12">
+    <main className="mx-auto max-w-3xl px-6 py-10">
       <PageView event="report_viewed" props={{ slug: params.slug, is_return: isReturn }} />
+
+      <div className="mb-8 print:hidden">
+        <BrandLogo height={28} />
+      </div>
 
       <header className="flex items-start justify-between gap-4">
         <div>

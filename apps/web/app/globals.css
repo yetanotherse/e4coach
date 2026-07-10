@@ -1,37 +1,86 @@
 @import 'chessground/assets/chessground.base.css';
-@import 'chessground/assets/chessground.brown.css';
 @import 'chessground/assets/chessground.cburnett.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ── e4coach design tokens (assets/e4coach-design-tokens.md) ───────── */
 :root {
+  --color-primary: #4f5bd5;
+  --color-primary-hover: #3f49be;
+  --color-primary-active: #343c9e;
+  --color-primary-subtle: #ecedfb;
+
+  --text-primary: #171720;
+  --text-secondary: #4b5162;
+  --text-muted: #6b7280;
+  --text-link: #4f5bd5;
+  --text-on-primary: #ffffff;
+
+  --surface-page: #f7f8fa;
+  --surface-card: #ffffff;
+  --surface-sunken: #eef0f4;
+  --surface-tint: #ecedfb;
+
+  --border: #e2e5ec;
+  --border-strong: #cbd0da;
+  --focus-ring: #4f5bd5;
+
+  /* branded chess board */
+  --board-light: #ecedfb; /* mist */
+  --board-dark: #949be6; /* indigo-300 */
+  --board-move: rgba(79, 91, 213, 0.28); /* last-move highlight (primary) */
+
   color-scheme: light;
 }
 
-body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+:root[data-theme='dark'] {
+  --color-primary: #4f5bd5;
+  --color-primary-hover: #6e78dc;
+  --color-primary-active: #7b85e4;
+  --color-primary-subtle: #20223a;
+
+  --text-primary: #f5f6fa;
+  --text-secondary: #a9aebe;
+  --text-muted: #7c8194;
+  --text-link: #8b93ec;
+
+  --surface-page: #0f0f16;
+  --surface-card: #1a1a24;
+  --surface-sunken: #14141c;
+  --surface-tint: #20223a;
+
+  --border: #2a2a38;
+  --border-strong: #3a3a4a;
+  --focus-ring: #6e78dc;
+
+  color-scheme: dark;
 }
 
-/* PDF export via browser print-to-PDF: lay the report out for paper. */
-@media print {
-  :root {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-  body {
-    background: #fff;
-  }
-  /* Keep chess piece sprites (CSS background images) in the print. */
-  cg-board,
-  .cg-wrap piece {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-  /* Don't split a weakness section or an example across pages. */
-  section,
-  figure {
-    break-inside: avoid;
-  }
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-body), 'DM Sans', 'Inter', system-ui, sans-serif;
+  @apply antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), 'Sora', sans-serif;
+}
+
+/* ── Branded chessboard (replaces the brown theme) ────────────────── */
+.cg-wrap cg-board {
+  background-color: var(--board-light);
+  /* 2×2 tile = two squares; tiled to an 8×8 checkerboard in brand colors */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2'%3E%3Crect width='2' height='2' fill='%23ecedfb'/%3E%3Crect x='1' width='1' height='1' fill='%23949be6'/%3E%3Crect y='1' width='1' height='1' fill='%23949be6'/%3E%3C/svg%3E");
+  background-size: 25% 25%;
+}
+.cg-wrap cg-board square.last-move {
+  background: var(--board-move);
+}
+.cg-wrap cg-board square.selected {
+  background: var(--board-move);
 }

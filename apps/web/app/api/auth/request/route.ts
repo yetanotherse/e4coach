@@ -25,11 +25,11 @@ export async function POST(req: Request): Promise<Response> {
     try {
       await mailer.send({
         to: user.email,
-        subject: 'Your Chess Coach sign-in link',
+        subject: 'Your e4coach sign-in link',
         html: `<p>Click to sign in and see your reports:</p>
-               <p><a href="${link}">Sign in to Chess Coach</a></p>
+               <p><a href="${link}">Sign in to e4coach</a></p>
                <p style="color:#666;font-size:13px">This link expires in 15 minutes.</p>`,
-        text: `Sign in to Chess Coach: ${link}`,
+        text: `Sign in to e4coach: ${link}`,
       });
     } catch {
       /* don't reveal delivery failures to the caller */

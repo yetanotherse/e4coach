@@ -39,7 +39,17 @@ export function ChessBoard({
       orientation,
       viewOnly: true,
       coordinates: true,
-      drawable: { enabled: false, autoShapes: shapes },
+      drawable: {
+        enabled: false,
+        autoShapes: shapes,
+        // On-brand arrows: better move = success green, played move = danger red.
+        brushes: {
+          green: { key: 'g', color: '#16A34A', opacity: 0.9, lineWidth: 10 },
+          red: { key: 'r', color: '#DC2626', opacity: 0.9, lineWidth: 10 },
+          blue: { key: 'b', color: '#2563EB', opacity: 0.9, lineWidth: 10 },
+          yellow: { key: 'y', color: '#D97706', opacity: 0.9, lineWidth: 10 },
+        },
+      },
     });
     return () => {
       apiRef.current?.destroy();
