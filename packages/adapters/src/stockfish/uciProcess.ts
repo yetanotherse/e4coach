@@ -2,6 +2,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface, type Interface } from 'node:readline';
 import type { EngineEval, EngineEvaluateOptions } from '@chess-coach/core';
 
+/** Upper bound for a single position evaluation. Depth-12 finishes in well
+ * under a second; this only trips when the engine has genuinely wedged. */
+const EVAL_TIMEOUT_MS = 30_000;
+
 /**
  * A single Stockfish process speaking UCI. Serializes one evaluate at a time.
  * Score is reported from the side-to-move perspective (matches cpFromEval).
@@ -11,10 +15,25 @@ export class UciProcess {
   private rl: Interface;
   private ready: Promise<void>;
   private busy = false;
+  /** Set once the process exits; used to fail in-flight and future evaluates. */
+  private exited: Error | null = null;
+  /** Reject hook for whatever operation is currently awaiting engine output. */
+  private rejectPending: ((err: Error) => void) | null = null;
+  /** True once dispose() is called, so the resulting exit isn't flagged a crash. */
+  private disposing = false;
 
   constructor(binPath: string) {
     this.proc = spawn(binPath, [], { stdio: 'pipe' });
     this.rl = createInterface({ input: this.proc.stdout });
+    // A crashed/killed Stockfish (e.g. OOM) otherwise stops emitting lines with
+    // no 'error' event, leaving evaluate() hung forever. Capture the exit and
+    // reject any pending operation so the job fails loudly instead of stalling.
+    this.proc.on('exit', (code, signal) => {
+      if (this.disposing) return;
+      this.exited = new Error(`stockfish exited unexpectedly (code=${code}, signal=${signal})`);
+      this.rejectPending?.(this.exited);
+      this.rejectPending = null;
+    });
     this.ready = this.handshake();
   }
 
@@ -24,12 +43,15 @@ export class UciProcess {
 
   private handshake(): Promise<void> {
     return new Promise((resolve, reject) => {
+      if (this.exited) return reject(this.exited);
+      this.rejectPending = reject;
       const onErr = (e: Error): void => reject(e);
       this.proc.once('error', onErr);
       const onLine = (line: string): void => {
         if (line.trim() === 'uciok') {
           this.rl.off('line', onLine);
           this.proc.off('error', onErr);
+          this.rejectPending = null;
           // Pin determinism: single thread + fixed hash, standard chess only.
           // With fixed depth this yields identical results across runs/machines.
           this.send('setoption name Threads value 1');
@@ -45,6 +67,7 @@ export class UciProcess {
 
   async evaluate(fen: string, opts: EngineEvaluateOptions): Promise<EngineEval> {
     if (this.busy) throw new Error('UciProcess is busy');
+    if (this.exited) throw this.exited;
     this.busy = true;
     try {
       await this.ready;
@@ -60,10 +83,13 @@ export class UciProcess {
   }
 
   private isReady(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      if (this.exited) return reject(this.exited);
+      this.rejectPending = reject;
       const onLine = (line: string): void => {
         if (line.trim() === 'readyok') {
           this.rl.off('line', onLine);
+          this.rejectPending = null;
           resolve();
         }
       };
@@ -74,13 +100,30 @@ export class UciProcess {
 
   private runGo(fen: string, opts: EngineEvaluateOptions): Promise<EngineEval> {
     return new Promise((resolve, reject) => {
+      if (this.exited) return reject(this.exited);
       let cp: number | undefined;
       let mate: number | undefined;
       let pv: string[] = [];
       let depth = 0;
 
-      const onErr = (err: Error): void => {
+      // Guard against a wedged (but not crashed) engine: without this a process
+      // that stops emitting `bestmove` would hang the whole job indefinitely.
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(`stockfish timed out after ${EVAL_TIMEOUT_MS}ms`));
+      }, EVAL_TIMEOUT_MS);
+      const cleanup = (): void => {
+        clearTimeout(timer);
         this.rl.off('line', onLine);
+        this.proc.off('error', onErr);
+        this.rejectPending = null;
+      };
+      const onErr = (err: Error): void => {
+        cleanup();
+        reject(err);
+      };
+      this.rejectPending = (err: Error): void => {
+        cleanup();
         reject(err);
       };
       const onLine = (line: string): void => {
@@ -92,8 +135,7 @@ export class UciProcess {
             if (parsed.depth) depth = parsed.depth;
           }
         } else if (line.startsWith('bestmove')) {
-          this.rl.off('line', onLine);
-          this.proc.off('error', onErr);
+          cleanup();
           const best = line.split(/\s+/)[1] ?? pv[0] ?? '(none)';
           resolve({ cp, mate, bestMove: best, pv: pv.length ? pv : [best], depth });
         }
@@ -113,6 +155,7 @@ export class UciProcess {
   }
 
   async dispose(): Promise<void> {
+    this.disposing = true; // expected exit — don't treat as a crash
     try {
       this.send('quit');
     } catch {

@@ -22,6 +22,7 @@ export async function processNextJob(deps: RunDeps): Promise<boolean> {
   });
   if (claim.count === 0) return false; // lost the race to another worker
 
+  console.log(`[poller] claimed job ${job.id} (source=${job.source})`);
   const user = await db.user.findUniqueOrThrow({ where: { id: job.userId } });
   try {
     await runJob(

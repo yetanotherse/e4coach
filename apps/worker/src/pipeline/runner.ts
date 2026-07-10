@@ -98,6 +98,7 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       });
     }
     if (games.length === 0) throw new Error('no games to analyze');
+    console.log(`[runner] job ${job.id} fetched ${games.length} game(s)`);
     await db.analysisJob.update({ where: { id: job.id }, data: { gameCount: games.length } });
 
     // ── Stages 2-4: parse → evaluate → classify (per game, isolated) ─
@@ -160,6 +161,7 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     } catch (err) {
       console.warn('[runner] report-ready email failed:', err instanceof Error ? err.message : err);
     }
+    console.log(`[runner] job ${job.id} DONE → /report/${slug} (${evalCount} evals, ${skipped} skipped)`);
     return slug;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -186,9 +188,13 @@ async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<Analy
   let evalCount = 0;
   let skipped = 0;
 
+  let index = 0;
   for (const game of games) {
+    index++;
     try {
       const parsed = parseGame(game);
+      console.log(`[runner] evaluating game ${index}/${games.length} (${game.id}, ${parsed.plies.length} plies)`);
+      const started = Date.now();
       const { lookup, evalCount: n } = await evaluateGame(game, parsed, deps.engine, {
         depth: deps.depth,
       });
@@ -196,6 +202,7 @@ async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<Analy
       const moves = scoreUserMoves(parsed, lookup);
       movesScored += moves.length;
       contexts.push({ game, moves, plies: parsed.plies });
+      console.log(`[runner]   done game ${index}/${games.length} in ${Date.now() - started}ms (${n} evals)`);
     } catch (err) {
       // One bad game must not fail the whole job (spec §11.4).
       skipped++;
@@ -293,5 +300,6 @@ async function setStage(
   status: Stage,
   stage: string,
 ): Promise<void> {
+  console.log(`[runner] job ${jobId} → ${status} (${stage})`);
   await db.analysisJob.update({ where: { id: jobId }, data: { status, stage } });
 }
