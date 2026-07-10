@@ -9,11 +9,11 @@ export async function sendReportReadyEmail(
 ): Promise<void> {
   const html = `
     <div style="font-family:system-ui,sans-serif;max-width:520px;margin:auto">
-      <h1 style="color:#22694b">Your chess weakness report for ${lichessUser} is ready</h1>
+      <h1 style="color:#4F5BD5">Your chess weakness report for ${lichessUser} is ready</h1>
       <p>Hi ${lichessUser}, we analyzed your recent Lichess games and found the patterns costing you the most rating.</p>
       <p style="margin:24px 0">
         <a href="${reportUrl}"
-           style="background:#2f7d5b;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">
+           style="background:#4F5BD5;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none">
           View ${lichessUser}'s report
         </a>
       </p>
