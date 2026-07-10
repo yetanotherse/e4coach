@@ -30,6 +30,11 @@ export class UciProcess {
         if (line.trim() === 'uciok') {
           this.rl.off('line', onLine);
           this.proc.off('error', onErr);
+          // Pin determinism: single thread + fixed hash, standard chess only.
+          // With fixed depth this yields identical results across runs/machines.
+          this.send('setoption name Threads value 1');
+          this.send('setoption name Hash value 16');
+          this.send('setoption name UCI_Chess960 value false');
           resolve();
         }
       };
@@ -96,9 +101,14 @@ export class UciProcess {
       this.rl.on('line', onLine);
       this.proc.once('error', onErr);
 
+      // Reset the transposition table before each position so the result is
+      // independent of the order the pool happened to feed positions in.
+      this.send('ucinewgame');
       this.send(`position fen ${fen}`);
-      if (opts.movetimeMs) this.send(`go movetime ${opts.movetimeMs}`);
-      else this.send(`go depth ${opts.depth ?? 14}`);
+      // Prefer fixed depth (deterministic). movetime is a non-deterministic
+      // opt-in kept for callers that explicitly want a time budget.
+      if (opts.depth) this.send(`go depth ${opts.depth}`);
+      else this.send(`go movetime ${opts.movetimeMs ?? 150}`);
     });
   }
 

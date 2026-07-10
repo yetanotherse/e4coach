@@ -8,8 +8,10 @@ import type { ChessEngine, EngineEval, ImportedGame } from '@chess-coach/core';
 import { type EvalLookup, type ParsedGame } from '@chess-coach/core';
 
 export interface EvaluateOptions {
-  movetimeMs: number;
+  /** fixed search depth — deterministic (preferred) */
   depth?: number;
+  /** time budget — non-deterministic fallback when depth is not set */
+  movetimeMs?: number;
 }
 
 /**
@@ -45,7 +47,9 @@ export async function evaluateGame(
   let evalCount = 0;
   for (const fen of needed) {
     if (cache.has(fen)) continue;
-    cache.set(fen, await engine.evaluate(fen, { movetimeMs: opts.movetimeMs, depth: opts.depth }));
+    // Prefer fixed depth for determinism; fall back to movetime only if no depth.
+    const evalOpts = opts.depth ? { depth: opts.depth } : { movetimeMs: opts.movetimeMs };
+    cache.set(fen, await engine.evaluate(fen, evalOpts));
     evalCount++;
   }
 

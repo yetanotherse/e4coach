@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   const username = process.argv[2] ?? 'EricRosen';
   const maxGames = Number(process.argv[3] ?? 2);
   const binPath = process.env.STOCKFISH_PATH ?? '/opt/homebrew/bin/stockfish';
-  const movetimeMs = 80;
+  const depth = 12;
 
   console.log(`Importing ${maxGames} games for ${username}…`);
   const source = new LichessGameSource({ userAgent: 'ChessCoachSmoke/0.1' });
@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   const started = Date.now();
   for (const game of games) {
     const parsed = parseGame(game);
-    const { lookup, evalCount } = await evaluateGame(game, parsed, engine, { movetimeMs });
+    const { lookup, evalCount } = await evaluateGame(game, parsed, engine, { depth });
     evalTotal += evalCount;
     const moves = scoreUserMoves(parsed, lookup);
     movesScored += moves.length;
@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     source: 'lichess',
     contexts,
     movesScored,
-    engineMeta: { kind: 'native', movetimeMs },
+    engineMeta: { kind: 'native', depth },
   });
 
   console.log(`\nElapsed: ${((Date.now() - started) / 1000).toFixed(1)}s, ${evalTotal} evals`);

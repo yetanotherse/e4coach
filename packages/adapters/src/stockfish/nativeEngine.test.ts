@@ -46,4 +46,23 @@ describe.skipIf(!bin)('StockfishNativeEngine (integration)', () => {
       await engine.dispose();
     }
   }, 20_000);
+
+  it('is deterministic at a fixed depth (same fen → same eval, even via the pool)', async () => {
+    const fen = 'r2q1rk1/1b1nbppp/p2ppn2/1p6/3NP3/1BN1B3/PPP1QPPP/R4RK1 w - - 0 12';
+    const engine = new StockfishNativeEngine({ binPath: bin!, poolSize: 3 });
+    try {
+      // Evaluate the same position many times across the pool; all must agree.
+      const runs = await Promise.all(
+        Array.from({ length: 6 }, () => engine.evaluate(fen, { depth: 14 })),
+      );
+      const first = runs[0]!;
+      for (const r of runs) {
+        expect(r.bestMove).toBe(first.bestMove);
+        expect(r.cp).toBe(first.cp);
+        expect(r.mate).toBe(first.mate);
+      }
+    } finally {
+      await engine.dispose();
+    }
+  }, 30_000);
 });
