@@ -46,4 +46,5 @@ export const StudyStartSchema = z.object({ email, consent });
 export const InterestSchema = z.object({
   tier: z.enum(['notify', 'monthly', 'annual']),
   reportSlug: z.string().max(64).optional(),
+  email: email.optional(), // homepage waitlist capture
 });

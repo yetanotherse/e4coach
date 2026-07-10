@@ -89,6 +89,7 @@ model Interest {
   id        String   @id @default(cuid())
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email     String? // waitlist contact — from the report user or the homepage form
   tier      String
   createdAt DateTime @default(now())
 
