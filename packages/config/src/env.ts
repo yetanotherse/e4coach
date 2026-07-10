@@ -62,7 +62,15 @@ let cached: Env | null = null;
 /** Parse & validate process.env once. Throws a readable error on misconfig. */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (cached) return cached;
-  const parsed = EnvSchema.safeParse(source);
+  // Trim stray surrounding whitespace from known keys before validating. Docker's
+  // `--env-file` keeps everything after `=` verbatim (trailing spaces included),
+  // which would otherwise fail enum checks (e.g. ENGINE_KIND="native   ").
+  const trimmed: NodeJS.ProcessEnv = { ...source };
+  for (const key of Object.keys(EnvSchema.shape)) {
+    const value = trimmed[key];
+    if (typeof value === 'string') trimmed[key] = value.trim();
+  }
+  const parsed = EnvSchema.safeParse(trimmed);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((i) => `  - ${i.path.join('.')}: ${i.message}`)

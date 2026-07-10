@@ -84,16 +84,29 @@ git clone <your-repo-url> chessapp && cd chessapp
 ### 3. Create the env file (CLI, no dashboard needed)
 
 The container reads its config from a `.env` file you pass with `--env-file`. Create it **outside
-git** on the server (e.g. `/opt/chessapp/worker.env`) and lock down its permissions — it holds
-secrets:
+git** on the server (e.g. `/opt/e4coach/worker.env`) and lock down its permissions — it holds
+secrets.
+
+> **Ownership matters:** `--env-file` is read by the **docker CLI as your user** (client-side,
+> before the container starts), *not* by the root daemon. So the file must be owned by — and
+> readable by — the user who runs `docker run`. Don't leave it `root`-owned (e.g. from `sudo tee`),
+> or you'll get `--env-file: permission denied`. Create it as your own user:
+
+> **`--env-file` is not a shell.** Docker takes everything after `=` **literally** — it does
+> **not** strip trailing spaces and does **not** support inline `# comments`. So `ENGINE_KIND=native   `
+> (trailing spaces) or `DATABASE_URL=... # note` become part of the value and fail validation
+> (`Invalid enum value ... received 'native   '`). Keep `#` comments on their **own lines**, put no
+> spaces around `=`, and no trailing whitespace. Do **not** quote values unless the quotes are meant
+> to be literal (docker keeps the quotes too).
 
 ```bash
-sudo mkdir -p /opt/chessapp
-sudo tee /opt/chessapp/worker.env >/dev/null <<'EOF'
+sudo mkdir -p /opt/e4coach && sudo chown "$(whoami)":"$(whoami)" /opt/e4coach
+cat > /opt/e4coach/worker.env <<'EOF'
 # --- connection (direct to Postgres; use the pooled URL for the app runtime) ---
-DATABASE_URL=postgres://...      # Supabase/Neon pooled URL
-DIRECT_URL=postgres://...        # direct URL (migrations)
-APP_URL=https://your-app.vercel.app   # web URL, used only for email report links
+DATABASE_URL=postgres://...
+DIRECT_URL=postgres://...
+# web URL, used only for email report links
+APP_URL=https://your-app.vercel.app
 
 # --- providers ---
 GAME_SOURCE=lichess
@@ -107,7 +120,7 @@ POSTHOG_KEY=...
 POSTHOG_HOST=https://us.i.posthog.com
 MAILER_PROVIDER=resend
 RESEND_API_KEY=...
-EMAIL_FROM="Chess Coach <coach@yourdomain.com>"
+EMAIL_FROM=Chess Coach <coach@yourdomain.com>
 LICHESS_USER_AGENT=ChessCoach/1.0 (you@example.com)
 
 # --- tuning (optional; these are the render.yaml defaults) ---
@@ -116,7 +129,10 @@ ENGINE_MOVETIME_MS=150
 WORKER_POLL_INTERVAL_MS=2000
 NODE_ENV=production
 EOF
-sudo chmod 600 /opt/chessapp/worker.env
+chmod 600 /opt/e4coach/worker.env   # owner-only; you own it, so docker can still read it
+
+# Guard against the trailing-space / inline-comment trap above:
+sed -i 's/[[:space:]]*$//' /opt/e4coach/worker.env
 ```
 
 > `ENGINE_KIND`, `STOCKFISH_PATH`, and the provider names are already baked into the Dockerfile,
@@ -131,7 +147,7 @@ docker build -f apps/worker/Dockerfile -t chess-coach-worker .
 ### 5. Run migrations once (if not already applied from elsewhere)
 
 ```bash
-docker run --rm --env-file /opt/chessapp/worker.env chess-coach-worker \
+docker run --rm --env-file /opt/e4coach/worker.env chess-coach-worker \
   pnpm --filter @chess-coach/db exec prisma migrate deploy
 ```
 
@@ -140,7 +156,7 @@ docker run --rm --env-file /opt/chessapp/worker.env chess-coach-worker \
 ```bash
 docker run -d \
   --name chess-coach-worker \
-  --env-file /opt/chessapp/worker.env \
+  --env-file /opt/e4coach/worker.env \
   --restart unless-stopped \
   chess-coach-worker
 ```
@@ -160,13 +176,13 @@ docker stop chess-coach-worker && docker rm chess-coach-worker
 cd chessapp && git pull
 docker build -f apps/worker/Dockerfile -t chess-coach-worker .
 docker stop chess-coach-worker && docker rm chess-coach-worker
-docker run -d --name chess-coach-worker --env-file /opt/chessapp/worker.env \
+docker run -d --name chess-coach-worker --env-file /opt/e4coach/worker.env \
   --restart unless-stopped chess-coach-worker
 ```
 
 ### Optional: docker compose (nicer for edits + boot persistence)
 
-Put this at `/opt/chessapp/docker-compose.yml` so config lives in one file:
+Put this at `/opt/e4coach/docker-compose.yml` so config lives in one file:
 
 ```yaml
 services:
@@ -175,7 +191,7 @@ services:
       context: .                      # run compose from the repo root
       dockerfile: apps/worker/Dockerfile
     image: chess-coach-worker
-    env_file: /opt/chessapp/worker.env
+    env_file: /opt/e4coach/worker.env
     restart: unless-stopped
 ```
 
