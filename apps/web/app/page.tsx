@@ -1,6 +1,7 @@
 import { ImportPanel } from '@/components/ImportPanel';
 import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
+import { BrandLogo } from '@/components/BrandLogo';
 
 const STEPS = [
   { title: 'We import your games', body: 'Your recent public Lichess games — no password, no OAuth.' },
@@ -14,8 +15,12 @@ export default function LandingPage({
   searchParams: { studyError?: string };
 }) {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-16">
+    <main className="mx-auto max-w-5xl px-6 py-10">
       <PageView event="landing_view" />
+
+      <header className="mb-12">
+        <BrandLogo />
+      </header>
 
       <section className="grid items-center gap-12 md:grid-cols-2">
         <div>
