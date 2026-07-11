@@ -5,6 +5,8 @@ export type AnalyticsEvent =
   | 'landing_view'
   | 'cta_click'
   | 'signup_submitted'
+  | 'pgn_upload_submitted'
+  | 'pgn_map_submitted'
   | 'signup_completed'
   | 'job_started'
   | 'job_completed'

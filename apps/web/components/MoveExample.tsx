@@ -32,6 +32,8 @@ export interface FullGame {
   pgn: string;
   userColor: 'white' | 'black';
   event?: string;
+  speed?: string; // time-control bucket, shown as a badge
+  timeControl?: string; // raw time control, tooltip on the badge
 }
 
 export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: FullGame }) {
@@ -91,8 +93,20 @@ export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: Full
       ) : null}
 
       <figcaption className="mt-2 text-sm text-neutral-600">
-        {fullGame?.event && (
-          <span className="mb-1 block text-xs font-medium text-neutral-500">{fullGame.event}</span>
+        {(fullGame?.event || fullGame?.speed) && (
+          <span className="mb-1 flex items-center gap-2">
+            {fullGame.event && (
+              <span className="text-xs font-medium text-neutral-500">{fullGame.event}</span>
+            )}
+            {fullGame.speed && (
+              <span
+                title={fullGame.timeControl}
+                className="rounded-full bg-brand/10 px-2 py-0.5 text-xs text-brand-dark"
+              >
+                {fullGame.speed}
+              </span>
+            )}
+          </span>
         )}
         <span className="flex flex-wrap items-center gap-2">
           <span>
@@ -138,7 +152,12 @@ export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: Full
             </button>
           )}
           {ex.gameUrl && !fullGame && (
-            <a href={ex.gameUrl} target="_blank" rel="noopener noreferrer" className="text-brand underline">
+            <a
+              href={ex.gameUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand underline"
+            >
               View on Lichess
             </a>
           )}

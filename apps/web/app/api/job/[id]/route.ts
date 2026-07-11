@@ -19,7 +19,9 @@ export async function GET(
     status: job.status,
     stage: job.stage,
     gameCount: job.gameCount,
-    lichessUser: job.user.lichessUser,
+    // PGN uploads aren't tied to an account (and the row may carry a stale
+    // lichessUser from an earlier flow) — show "your games" instead.
+    lichessUser: job.source === 'pgn' ? null : job.user.lichessUser,
     error: job.error,
     reportSlug: job.report?.publicSlug ?? null,
   });

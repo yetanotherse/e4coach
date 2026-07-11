@@ -24,6 +24,8 @@ export interface EmbeddedGame {
   white: string;
   black: string;
   event?: string; // [Event] tag, to help the user recall the game
+  speed?: string; // time-control bucket (bullet…classical), for a per-game badge
+  timeControl?: string; // raw time control, if known
 }
 
 export interface ReportContent {
