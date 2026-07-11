@@ -11,6 +11,8 @@ const CLIENT_EVENTS = [
   'landing_view',
   'cta_click',
   'signup_submitted',
+  'pgn_upload_submitted',
+  'pgn_map_submitted',
   'report_viewed',
   'report_shared',
   'reanalyze_clicked',

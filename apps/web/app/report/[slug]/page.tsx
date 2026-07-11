@@ -16,7 +16,14 @@ function gameTypeLabel(scope: AnalysisScope): string | null {
   return `Mixed: ${types.join(', ')}`;
 }
 
-function scopeLine(scope: WeaknessProfile['scope']): string | null {
+/** Human label for a job source. */
+function sourceLabel(source: string): string {
+  if (source === 'lichess') return 'Lichess';
+  if (source === 'lichess-study') return 'Lichess studies';
+  return source;
+}
+
+function scopeLine(scope: WeaknessProfile['scope'], source: string): string | null {
   if (!scope) return null;
   const analyzed = scope.gameTypes?.length ? scope.gameTypes : scope.perfTypes;
   const typePhrase = analyzed.length === 1 ? `${analyzed[0]} ` : '';
@@ -24,6 +31,12 @@ function scopeLine(scope: WeaknessProfile['scope']): string | null {
     scope.dateFrom && scope.dateTo ? ` played ${fmt(scope.dateFrom)}–${fmt(scope.dateTo)}` : '';
   const skipped =
     scope.skipped > 0 ? ` ${scope.skipped} were skipped (non-standard or unreadable).` : '';
+
+  // Uploaded games aren't fetched "most recent rated" — describe them plainly.
+  if (source === 'pgn') {
+    return `Analyzed all ${scope.gamesAnalyzed} of your uploaded ${typePhrase}games${dates}.${skipped}`;
+  }
+
   // If the user requested types that didn't appear in their most-recent games,
   // say so — otherwise a bullet-heavy player who picked 3 types is confused.
   const requested = scope.perfTypes ?? [];
@@ -63,7 +76,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
 
   const content = report.content as unknown as ReportContent;
   const profile = report.profile as unknown as WeaknessProfile;
-  const scope = scopeLine(profile.scope);
+  const scope = scopeLine(profile.scope, profile.source);
   const gameType = profile.scope ? gameTypeLabel(profile.scope) : null;
 
   return (
@@ -77,12 +90,13 @@ export default async function ReportPage({ params }: { params: { slug: string } 
       <header className="flex items-start justify-between gap-4">
         <div>
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-brand">
-            {profile.username && (
+            {profile.source === 'pgn' ? (
+              <span>Analysis of your uploaded games</span>
+            ) : profile.username ? (
               <span>
-                Analysis for {profile.username} on{' '}
-                {profile.source === 'lichess' ? 'Lichess' : profile.source}
+                Analysis for {profile.username} on {sourceLabel(profile.source)}
               </span>
-            )}
+            ) : null}
             {gameType && (
               <span className="rounded-full bg-brand/10 px-2 py-0.5 text-xs text-brand-dark">
                 {gameType}
@@ -138,6 +152,8 @@ export default async function ReportPage({ params }: { params: { slug: string } 
                               pgn: g.pgn,
                               userColor: g.userColor,
                               ...(g.event ? { event: g.event } : {}),
+                              ...(g.speed ? { speed: g.speed } : {}),
+                              ...(g.timeControl ? { timeControl: g.timeControl } : {}),
                             },
                           }
                         : {})}

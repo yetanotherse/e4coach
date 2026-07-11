@@ -92,7 +92,7 @@ function idFor(tags: Record<string, string>): string | undefined {
   return undefined;
 }
 
-function playedAtFrom(tags: Record<string, string>): string {
+export function playedAtFrom(tags: Record<string, string>): string {
   const date = tags.UTCDate ?? tags.Date;
   if (date && /^\d{4}\.\d{2}\.\d{2}$/.test(date)) {
     return new Date(date.replace(/\./g, '-') + 'T00:00:00.000Z').toISOString();
@@ -144,9 +144,7 @@ function chapterToGame(
 
   const id = idFor(tags) ?? `study-${Math.abs(hash(chapter))}`;
   const result =
-    tags.Result === '1-0' || tags.Result === '0-1' || tags.Result === '1/2-1/2'
-      ? tags.Result
-      : '*';
+    tags.Result === '1-0' || tags.Result === '0-1' || tags.Result === '1/2-1/2' ? tags.Result : '*';
 
   return {
     id,
@@ -184,7 +182,7 @@ export function parseLichessStudies(pgn: string, opts: ParseStudiesOptions): Par
   return { games, skipped };
 }
 
-function hash(s: string): number {
+export function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);

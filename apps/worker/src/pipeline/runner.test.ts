@@ -129,4 +129,33 @@ describe('runJob (full pipeline on mocks)', () => {
     // Referenced games are embedded for the in-app stepper when any example fired.
     expect(content.games).toBeDefined();
   });
+
+  it('pgn source runs with no lichess username and embeds referenced PGNs', async () => {
+    const gameRow = {
+      externalId: 'pgn-123',
+      pgn: '1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. b4 Bxb4 5. c3 Ba5 6. d4 exd4 7. O-O',
+      white: 'Alice',
+      black: 'Bob',
+      userColor: 'white',
+      result: '*',
+      timeControl: '600+5',
+      speed: 'rapid',
+      playedAt: new Date('2026-06-01T00:00:00Z'),
+    };
+    const { db, state } = fakeDb([gameRow]);
+    const pgnJob = { id: 'j3', userId: 'u1', source: 'pgn' };
+    // No lichessUser — PGN uploads have no Lichess account.
+    const slug = await runJob(pgnJob, { ...user, lichessUser: null }, makeDeps(db));
+
+    expect(slug).toBeTruthy();
+    const doneUpdate = state.jobUpdates.find((u) => u.status === 'DONE');
+    expect(doneUpdate).toBeDefined();
+    const content = state.reports[0]!.content as {
+      games?: Record<string, { speed?: string; timeControl?: string }>;
+    };
+    expect(content.games).toBeDefined();
+    // The per-game time-control badge data is carried onto embedded games.
+    const embedded = Object.values(content.games!);
+    expect(embedded.some((g) => g.speed === 'rapid')).toBe(true);
+  });
 });

@@ -1,14 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { SignupForm } from './SignupForm';
 import { StudyImportForm } from './StudyImportForm';
 
-type Mode = 'games' | 'studies';
+type Mode = 'games' | 'studies' | 'pgn';
 
 const TABS: { id: Mode; label: string }[] = [
   { id: 'games', label: 'Recent games' },
   { id: 'studies', label: 'My studies' },
+  { id: 'pgn', label: 'PGN files' },
 ];
 
 export function ImportPanel({ studyError }: { studyError?: string }) {
@@ -36,7 +38,22 @@ export function ImportPanel({ studyError }: { studyError?: string }) {
         </p>
       )}
 
-      {mode === 'games' ? <SignupForm /> : <StudyImportForm />}
+      {mode === 'games' && <SignupForm />}
+      {mode === 'studies' && <StudyImportForm />}
+      {mode === 'pgn' && (
+        <div className="space-y-3 text-sm text-neutral-600">
+          <p>
+            Upload PGN file(s) — one or more games — and analyze them without a Lichess account.
+            You&apos;ll set which side you played for each game on the next page.
+          </p>
+          <Link
+            href="/import/pgn"
+            className="inline-block rounded-lg bg-brand px-4 py-2.5 font-semibold text-white transition hover:bg-brand-dark"
+          >
+            Upload PGN files →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
