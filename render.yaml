@@ -12,7 +12,7 @@ services:
       - key: ENGINE_KIND
         value: native
       - key: STOCKFISH_PATH
-        value: /usr/games/stockfish
+        value: /usr/local/bin/stockfish
       - key: GAME_SOURCE
         value: lichess
       - key: LLM_PROVIDER

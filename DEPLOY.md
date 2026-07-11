@@ -111,7 +111,7 @@ APP_URL=https://your-app.vercel.app
 # --- providers ---
 GAME_SOURCE=lichess
 ENGINE_KIND=native
-STOCKFISH_PATH=/usr/games/stockfish
+STOCKFISH_PATH=/usr/local/bin/stockfish
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-2.5-flash
 GEMINI_API_KEY=...
@@ -137,6 +137,22 @@ sed -i 's/[[:space:]]*$//' /opt/e4coach/worker.env
 
 > `ENGINE_KIND`, `STOCKFISH_PATH`, and the provider names are already baked into the Dockerfile,
 > but keeping them in the env file makes the container's config explicit and easy to override.
+
+> **Stockfish lives *inside* the container.** The image compiles a modern Stockfish from source
+> (statically linked) to `/usr/local/bin/stockfish` — Debian's apt package is old and gives
+> different fixed-depth evals. Do **not** point `STOCKFISH_PATH` at a binary on the host
+> (e.g. `/usr/local/bin/stockfish` you installed with `make`): the container can't see the host
+> filesystem, so you'll get `Error: spawn … ENOENT`. Pick the engine version/arch at **build time**:
+>
+> ```bash
+> # match your local engine version (see it via `stockfish` then type `uci`), and
+> # drop to a more portable arch if the CPU lacks AVX2 (else you'll get SIGILL):
+> docker build -f apps/worker/Dockerfile \
+>   --build-arg STOCKFISH_REF=sf_18 \
+>   --build-arg STOCKFISH_ARCH=x86-64-avx2 \
+>   -t chess-coach-worker .
+> # docker compose: pass the same via `args:` under build (see the compose example below).
+> ```
 
 ### 4. Build the image (build context = repo root)
 
@@ -190,6 +206,9 @@ services:
     build:
       context: .                      # run compose from the repo root
       dockerfile: apps/worker/Dockerfile
+      args:
+        STOCKFISH_REF: sf_18          # engine version — match your local engine
+        STOCKFISH_ARCH: x86-64-avx2   # x86-64-sse41-popcnt or x86-64 for older CPUs
     image: chess-coach-worker
     env_file: /opt/e4coach/worker.env
     restart: unless-stopped
