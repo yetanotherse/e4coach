@@ -4,9 +4,7 @@
  */
 import { z } from 'zod';
 
-const boolish = z
-  .enum(['true', 'false', '1', '0'])
-  .transform((v) => v === 'true' || v === '1');
+const boolish = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 
 const EnvSchema = z.object({
   // Database — Postgres connection strings aren't always strict WHATWG URLs
@@ -30,6 +28,14 @@ const EnvSchema = z.object({
   // primary knob. ENGINE_MOVETIME_MS is a non-deterministic time-budget fallback.
   ENGINE_DEPTH: z.coerce.number().int().min(6).max(30).default(12),
   ENGINE_MOVETIME_MS: z.coerce.number().int().positive().default(150),
+  // UCI Threads per engine process. Keep at 1 for deterministic, reproducible
+  // analysis (multi-threaded Stockfish search is non-deterministic). Use more
+  // cores via ENGINE_POOL_SIZE instead — that stays deterministic.
+  ENGINE_THREADS: z.coerce.number().int().min(1).max(1024).default(1),
+  // UCI Hash (MB) per engine process. Total worker RAM ≈ pool size × this.
+  ENGINE_HASH: z.coerce.number().int().min(1).max(65536).default(256),
+  // Parallel engine processes; set to the CPU-core count to saturate the box.
+  ENGINE_POOL_SIZE: z.coerce.number().int().min(1).max(64).default(2),
 
   // Game source
   GAME_SOURCE: z.enum(['mock', 'lichess']).default('mock'),

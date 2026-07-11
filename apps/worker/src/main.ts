@@ -3,6 +3,7 @@
  * the job poll loop until SIGINT/SIGTERM.
  */
 import './loadEnv.js'; // must run before config is read
+import { availableParallelism } from 'node:os';
 import { loadEnv } from '@chess-coach/config';
 import {
   createAnalytics,
@@ -45,11 +46,24 @@ async function main(): Promise<void> {
   console.log('[worker] started', {
     gameSource: deps.gameSource.name,
     engine: deps.engine.name,
+    enginePool: env.ENGINE_POOL_SIZE,
+    engineThreads: env.ENGINE_THREADS,
+    engineHash: env.ENGINE_HASH,
     llm: deps.llm.name,
     pollMs: env.WORKER_POLL_INTERVAL_MS,
     db: dbTarget(env.DATABASE_URL),
     appUrl: env.APP_URL,
   });
+
+  // Warn if the engine pool oversubscribes the CPU: pool × threads competing for
+  // fewer cores slows every search instead of speeding it up.
+  const cores = availableParallelism();
+  const wanted = env.ENGINE_POOL_SIZE * env.ENGINE_THREADS;
+  if (wanted > cores) {
+    console.warn(
+      `[worker] WARNING: ENGINE_POOL_SIZE(${env.ENGINE_POOL_SIZE}) × ENGINE_THREADS(${env.ENGINE_THREADS}) = ${wanted} exceeds ${cores} CPU core(s) — this oversubscribes the CPU and will slow analysis. Lower them to fit the box.`,
+    );
+  }
 
   // APP_URL is baked into every report link we email. If it's still the
   // localhost default in production, users get unreachable links — surface it
