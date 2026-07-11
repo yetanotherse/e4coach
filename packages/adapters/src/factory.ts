@@ -34,7 +34,12 @@ export function createEngine(env: Env): ChessEngine {
       return new MockEngine();
     case 'native':
       if (!env.STOCKFISH_PATH) throw new Error('STOCKFISH_PATH is required for native engine');
-      return new StockfishNativeEngine({ binPath: env.STOCKFISH_PATH });
+      return new StockfishNativeEngine({
+        binPath: env.STOCKFISH_PATH,
+        poolSize: env.ENGINE_POOL_SIZE,
+        threads: env.ENGINE_THREADS,
+        hash: env.ENGINE_HASH,
+      });
     case 'wasm':
       throw new Error('StockfishWasmEngine not yet implemented (fallback adapter)');
   }

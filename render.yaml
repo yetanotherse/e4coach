@@ -27,6 +27,14 @@ services:
         value: "20"
       - key: ENGINE_MOVETIME_MS
         value: "150"
+      # Cores: run ENGINE_POOL_SIZE single-threaded engines (deterministic).
+      # Bump ENGINE_POOL_SIZE to the plan's core count; total RAM ≈ pool × hash.
+      - key: ENGINE_POOL_SIZE
+        value: "2"
+      - key: ENGINE_THREADS
+        value: "1"
+      - key: ENGINE_HASH
+        value: "256"
       - key: WORKER_POLL_INTERVAL_MS
         value: "2000"
       # Secrets — set these in the dashboard (sync:false keeps them out of git):

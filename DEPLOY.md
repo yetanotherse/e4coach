@@ -128,6 +128,14 @@ MAX_GAMES_PER_JOB=20
 ENGINE_MOVETIME_MS=150
 WORKER_POLL_INTERVAL_MS=2000
 NODE_ENV=production
+# --- engine cores (set ENGINE_POOL_SIZE to your CPU-core count) ---
+# ENGINE_POOL_SIZE single-threaded engines run in parallel, one per core.
+# Keep ENGINE_THREADS=1: it keeps analysis deterministic (same games -> same
+# report). Raising ENGINE_THREADS makes Stockfish search non-deterministic.
+# Total worker RAM is roughly ENGINE_POOL_SIZE x ENGINE_HASH (MB), so 4 x 256 = ~1 GB.
+ENGINE_POOL_SIZE=4
+ENGINE_THREADS=1
+ENGINE_HASH=256
 EOF
 chmod 600 /opt/e4coach/worker.env   # owner-only; you own it, so docker can still read it
 

@@ -5,6 +5,10 @@ export interface StockfishNativeOptions {
   binPath: string;
   /** number of parallel engine processes; defaults to 2 */
   poolSize?: number;
+  /** UCI Threads per process (default 1 — keeps analysis deterministic) */
+  threads?: number;
+  /** UCI Hash (MB) per process (default 16) */
+  hash?: number;
 }
 
 interface Waiter {
@@ -28,7 +32,10 @@ export class StockfishNativeEngine implements ChessEngine {
 
   constructor(opts: StockfishNativeOptions) {
     const size = Math.max(1, opts.poolSize ?? 2);
-    this.pool = Array.from({ length: size }, () => new UciProcess(opts.binPath));
+    this.pool = Array.from(
+      { length: size },
+      () => new UciProcess(opts.binPath, { threads: opts.threads, hash: opts.hash }),
+    );
     this.idle = [...this.pool];
   }
 

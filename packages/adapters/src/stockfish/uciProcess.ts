@@ -6,6 +6,27 @@ import type { EngineEval, EngineEvaluateOptions } from '@chess-coach/core';
  * under a second; this only trips when the engine has genuinely wedged. */
 const EVAL_TIMEOUT_MS = 30_000;
 
+/** Per-process UCI tuning. Threads>1 makes search non-deterministic. */
+export interface UciOptions {
+  /** UCI Threads (default 1 — deterministic). */
+  threads?: number;
+  /** UCI Hash in MB (default 16). */
+  hash?: number;
+}
+
+/**
+ * The `setoption` commands sent after `uciok`. Extracted (and pure) so the
+ * Threads/Hash wiring can be unit-tested without spawning Stockfish.
+ * UCI_Chess960 is pinned off — we only analyze standard chess.
+ */
+export function engineSetOptions(threads: number, hash: number): string[] {
+  return [
+    `setoption name Threads value ${threads}`,
+    `setoption name Hash value ${hash}`,
+    'setoption name UCI_Chess960 value false',
+  ];
+}
+
 /**
  * A single Stockfish process speaking UCI. Serializes one evaluate at a time.
  * Score is reported from the side-to-move perspective (matches cpFromEval).
@@ -15,6 +36,8 @@ export class UciProcess {
   private rl: Interface;
   private ready: Promise<void>;
   private busy = false;
+  private readonly threads: number;
+  private readonly hash: number;
   /** Set once the process exits; used to fail in-flight and future evaluates. */
   private exited: Error | null = null;
   /** Reject hook for whatever operation is currently awaiting engine output. */
@@ -22,7 +45,9 @@ export class UciProcess {
   /** True once dispose() is called, so the resulting exit isn't flagged a crash. */
   private disposing = false;
 
-  constructor(binPath: string) {
+  constructor(binPath: string, opts: UciOptions = {}) {
+    this.threads = opts.threads ?? 1;
+    this.hash = opts.hash ?? 16;
     this.proc = spawn(binPath, [], { stdio: 'pipe' });
     this.rl = createInterface({ input: this.proc.stdout });
     // A crashed/killed Stockfish (e.g. OOM) otherwise stops emitting lines with
@@ -52,11 +77,11 @@ export class UciProcess {
           this.rl.off('line', onLine);
           this.proc.off('error', onErr);
           this.rejectPending = null;
-          // Pin determinism: single thread + fixed hash, standard chess only.
-          // With fixed depth this yields identical results across runs/machines.
-          this.send('setoption name Threads value 1');
-          this.send('setoption name Hash value 16');
-          this.send('setoption name UCI_Chess960 value false');
+          // Analysis is deterministic when Threads=1 (default): at fixed depth
+          // it yields identical results across runs/machines, and ucinewgame
+          // before each position (see runGo) makes pool order irrelevant.
+          // Threads>1 speeds a single search but is non-deterministic.
+          for (const cmd of engineSetOptions(this.threads, this.hash)) this.send(cmd);
           resolve();
         }
       };
