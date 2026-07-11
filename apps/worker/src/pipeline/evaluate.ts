@@ -44,14 +44,15 @@ export async function evaluateGame(
     needed.add(ply.fenAfter);
   }
 
-  let evalCount = 0;
-  for (const fen of needed) {
-    if (cache.has(fen)) continue;
-    // Prefer fixed depth for determinism; fall back to movetime only if no depth.
-    const evalOpts = opts.depth ? { depth: opts.depth } : { movetimeMs: opts.movetimeMs };
-    cache.set(fen, await engine.evaluate(fen, evalOpts));
-    evalCount++;
-  }
+  // Prefer fixed depth for determinism; fall back to movetime only if no depth.
+  const evalOpts = opts.depth ? { depth: opts.depth } : { movetimeMs: opts.movetimeMs };
+  // Dispatch all positions at once and let the engine pool bound real
+  // concurrency to poolSize. Evaluating serially here would leave every pooled
+  // engine but one idle (poolSize has no effect). Each FEN is independent and
+  // deterministic (ucinewgame + fixed depth), so order does not matter.
+  const toEval = [...needed].filter((fen) => !cache.has(fen));
+  const results = await Promise.all(toEval.map((fen) => engine.evaluate(fen, evalOpts)));
+  toEval.forEach((fen, i) => cache.set(fen, results[i]!));
 
-  return { lookup: (fen: string) => cache.get(fen), evalCount };
+  return { lookup: (fen: string) => cache.get(fen), evalCount: toEval.length };
 }
