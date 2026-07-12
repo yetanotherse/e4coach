@@ -4,7 +4,7 @@
  */
 import './loadEnv.js'; // must run before config is read
 import { availableParallelism } from 'node:os';
-import { loadEnv } from '@chess-coach/config';
+import { loadEnv, dbFingerprint } from '@chess-coach/config';
 import {
   createAnalytics,
   createEngine,
@@ -52,6 +52,7 @@ async function main(): Promise<void> {
     llm: deps.llm.name,
     pollMs: env.WORKER_POLL_INTERVAL_MS,
     db: dbTarget(env.DATABASE_URL),
+    dbFingerprint: dbFingerprint(env.DATABASE_URL),
     appUrl: env.APP_URL,
   });
 
