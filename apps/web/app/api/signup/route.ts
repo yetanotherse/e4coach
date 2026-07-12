@@ -36,7 +36,10 @@ export async function POST(req: Request): Promise<Response> {
 
   // Avoid piling up duplicate jobs if the user resubmits while one is running.
   const active = await prisma.analysisJob.findFirst({
-    where: { userId: user.id, status: { in: ['PENDING', 'FETCHING', 'EVALUATING', 'CLASSIFYING', 'GENERATING'] } },
+    where: {
+      userId: user.id,
+      status: { in: ['PENDING', 'FETCHING', 'EVALUATING', 'CLASSIFYING', 'GENERATING'] },
+    },
     orderBy: { createdAt: 'desc' },
   });
   const job =
@@ -47,7 +50,11 @@ export async function POST(req: Request): Promise<Response> {
 
   // Surface which DB this job landed in — compare to the worker's boot
   // dbFingerprint if the job never gets processed (mismatch = different DBs).
-  console.log(`[signup] job ${job.id} created (source=${source}, db ${dbFingerprint(env.DATABASE_URL)})`);
+  // "reused" means an active job already existed (de-dup), so no new PENDING
+  // row was created — worth distinguishing when debugging "nothing happens".
+  console.log(
+    `[signup] job ${job.id} ${active ? 'reused' : 'queued'} (source=${source}, db ${dbFingerprint(env.DATABASE_URL)})`,
+  );
 
   await analytics.capture(emailHash, 'signup_completed', { source });
   if (!active) await analytics.capture(emailHash, 'job_started', { jobId: job.id, source });

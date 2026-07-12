@@ -121,7 +121,20 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
 
     // ── Stages 2-4: parse → evaluate → classify (per game, isolated) ─
     await setStage(db, job.id, 'EVALUATING', 'evaluating positions');
-    const { contexts, movesScored, evalCount, skipped } = await analyzeGames(games, deps);
+    // Heartbeat after each game so the row's updatedAt stays fresh through the
+    // long EVALUATING stage — that's how stale-job recovery tells a live job
+    // (progressing) from one stranded by a killed worker. Failures are ignored
+    // (a missed heartbeat must not fail the job).
+    const heartbeat = async (done: number, total: number): Promise<void> => {
+      await db.analysisJob
+        .update({ where: { id: job.id }, data: { stage: `evaluating game ${done}/${total}` } })
+        .catch(() => {});
+    };
+    const { contexts, movesScored, evalCount, skipped } = await analyzeGames(
+      games,
+      deps,
+      heartbeat,
+    );
 
     await setStage(db, job.id, 'CLASSIFYING', 'classifying weaknesses');
     const scope = buildScope(games, contexts.length, skipped, requestedMax, perfTypes);
@@ -197,7 +210,11 @@ interface AnalyzeResult {
 }
 
 /** Parse + evaluate + score each game, isolating per-game failures. */
-async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<AnalyzeResult> {
+async function analyzeGames(
+  games: ImportedGame[],
+  deps: RunDeps,
+  heartbeat?: (done: number, total: number) => Promise<void>,
+): Promise<AnalyzeResult> {
   const contexts: GameContext[] = [];
   let movesScored = 0;
   let evalCount = 0;
@@ -227,6 +244,7 @@ async function analyzeGames(games: ImportedGame[], deps: RunDeps): Promise<Analy
       skipped++;
       console.warn(`[runner] skipped game ${game.id}:`, err instanceof Error ? err.message : err);
     }
+    await heartbeat?.(index, games.length);
   }
 
   return { contexts, movesScored, evalCount, skipped };
