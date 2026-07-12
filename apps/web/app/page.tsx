@@ -2,6 +2,7 @@ import { ImportPanel } from '@/components/ImportPanel';
 import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
 import { BrandLogo } from '@/components/BrandLogo';
+import { CoreIdea } from '@/components/CoreIdea';
 
 const STEPS = [
   { title: 'We import your games', body: 'Your recent public Lichess games — no password, no OAuth.' },
@@ -49,6 +50,10 @@ export default function LandingPage({
         <div className="rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
           <ImportPanel {...(searchParams.studyError ? { studyError: searchParams.studyError } : {})} />
         </div>
+      </section>
+
+      <section className="mt-16">
+        <CoreIdea />
       </section>
 
       <section className="mt-16">
