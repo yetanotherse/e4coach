@@ -94,7 +94,12 @@ async function main(): Promise<void> {
     });
   }
 
-  await runPollLoop(deps, { intervalMs: env.WORKER_POLL_INTERVAL_MS, signal: controller.signal });
+  await runPollLoop(deps, {
+    intervalMs: env.WORKER_POLL_INTERVAL_MS,
+    signal: controller.signal,
+    staleJobMs: env.WORKER_STALE_JOB_MS,
+    maxAttempts: env.WORKER_MAX_ATTEMPTS,
+  });
   await deps.engine.dispose();
   await deps.analytics.flush();
   console.log('[worker] stopped');

@@ -71,6 +71,14 @@ const EnvSchema = z.object({
 
   // Worker
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  // Stale-job recovery: a job claimed but left in an in-progress state with no
+  // progress for this long (a killed/restarted worker) is requeued to PENDING.
+  // Must exceed the gap between runner heartbeats (one game's eval) plus the
+  // longest non-heartbeat stage — 10 min is comfortably safe.
+  WORKER_STALE_JOB_MS: z.coerce.number().int().positive().default(600_000),
+  // Give up (mark FAILED) after this many claim attempts, so a job that keeps
+  // killing the worker can't loop forever.
+  WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
 
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
