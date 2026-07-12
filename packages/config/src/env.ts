@@ -40,7 +40,10 @@ const EnvSchema = z.object({
   // Game source
   GAME_SOURCE: z.enum(['mock', 'lichess']).default('mock'),
   LICHESS_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),
-  MAX_GAMES_PER_JOB: z.coerce.number().int().positive().max(100).default(30),
+  // Hard ceiling on live-fetched games per job. Must be >= the largest option
+  // in the signup dropdown (currently 60), otherwise a user's selection is
+  // silently clamped down by the worker (runner.ts requestedMax = min(...)).
+  MAX_GAMES_PER_JOB: z.coerce.number().int().positive().max(100).default(60),
   // Cap on games actually analyzed for pre-stored sources (studies/PGN). Higher
   // than the live-fetch cap for testing; lower before public launch.
   MAX_ANALYZED_GAMES: z.coerce.number().int().positive().max(1000).default(50),
