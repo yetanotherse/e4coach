@@ -124,7 +124,10 @@ EMAIL_FROM=Chess Coach <coach@yourdomain.com>
 LICHESS_USER_AGENT=ChessCoach/1.0 (you@example.com)
 
 # --- tuning (optional; these are the render.yaml defaults) ---
-MAX_GAMES_PER_JOB=20
+# Ceiling on live-fetched games per job. Keep >= the signup dropdown's max (60)
+# or a user's "recent 30/40/60" selection is silently clamped to this number.
+# Higher = slower (roughly linear: ~3-4 min per 12 games at depth 16).
+MAX_GAMES_PER_JOB=60
 ENGINE_MOVETIME_MS=150
 WORKER_POLL_INTERVAL_MS=2000
 NODE_ENV=production

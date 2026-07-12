@@ -23,8 +23,9 @@ services:
         value: posthog
       - key: MAILER_PROVIDER
         value: resend
+      # Must be >= the signup dropdown's max (60) or selections get clamped.
       - key: MAX_GAMES_PER_JOB
-        value: "20"
+        value: "60"
       - key: ENGINE_MOVETIME_MS
         value: "150"
       # Cores: run ENGINE_POOL_SIZE single-threaded engines (deterministic).
