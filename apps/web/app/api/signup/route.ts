@@ -1,3 +1,4 @@
+import { dbFingerprint } from '@chess-coach/config';
 import { SignupSchema } from '@/lib/validation';
 import { analytics, env, jsonError, jsonOk, prisma } from '@/lib/server';
 import { hashEmail } from '@/lib/hash';
@@ -43,6 +44,10 @@ export async function POST(req: Request): Promise<Response> {
     (await prisma.analysisJob.create({
       data: { userId: user.id, source, status: 'PENDING', ...(params ? { params } : {}) },
     }));
+
+  // Surface which DB this job landed in — compare to the worker's boot
+  // dbFingerprint if the job never gets processed (mismatch = different DBs).
+  console.log(`[signup] job ${job.id} created (source=${source}, db ${dbFingerprint(env.DATABASE_URL)})`);
 
   await analytics.capture(emailHash, 'signup_completed', { source });
   if (!active) await analytics.capture(emailHash, 'job_started', { jobId: job.id, source });

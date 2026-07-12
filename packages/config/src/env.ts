@@ -2,9 +2,20 @@
  * Typed, Zod-validated environment (spec §11.2, §16). Fail fast at startup on
  * missing/invalid config. This is the single boundary where process.env is read.
  */
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 const boolish = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
+
+/**
+ * A short, non-reversible fingerprint of a connection string. Printed by both
+ * the web app and the worker so "are we on the same database?" is a one-glance
+ * check — matching fingerprints = same DB. Leaks nothing (one-way hash), so it's
+ * safe to log and to expose on a health endpoint.
+ */
+export function dbFingerprint(url: string): string {
+  return createHash('sha256').update(url).digest('hex').slice(0, 8);
+}
 
 const EnvSchema = z.object({
   // Database — Postgres connection strings aren't always strict WHATWG URLs
