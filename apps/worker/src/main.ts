@@ -51,6 +51,8 @@ async function main(): Promise<void> {
     engineHash: env.ENGINE_HASH,
     llm: deps.llm.name,
     pollMs: env.WORKER_POLL_INTERVAL_MS,
+    maxGamesPerJob: env.MAX_GAMES_PER_JOB,
+    maxAnalyzed: env.MAX_ANALYZED_GAMES,
     db: dbTarget(env.DATABASE_URL),
     dbFingerprint: dbFingerprint(env.DATABASE_URL),
     appUrl: env.APP_URL,

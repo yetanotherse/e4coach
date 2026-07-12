@@ -109,6 +109,11 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     } else {
       requestedMax = Math.min(job.params?.maxGames ?? deps.maxGames, deps.maxGames);
       perfTypes = job.params?.perfTypes?.length ? job.params.perfTypes : DEFAULT_PERF_TYPES;
+      // Make the cap chain visible: if this says "cap 20" the worker's
+      // MAX_GAMES_PER_JOB env is still 20 (worker.env not reloaded).
+      console.log(
+        `[runner] job ${job.id} live fetch: up to ${requestedMax} (selected ${job.params?.maxGames ?? 'default'}, cap ${deps.maxGames})`,
+      );
       games = await deps.gameSource.fetchRecentGames(user.lichessUser!, {
         max: requestedMax,
         rated: true,
