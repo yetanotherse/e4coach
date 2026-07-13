@@ -57,7 +57,13 @@ export class LichessGameSource implements GameSource {
     const games = this.parseNdjson(text)
       .filter((g) => (g.variant ?? 'standard') === 'standard')
       .map((g) => this.toImportedGame(g, username))
-      .filter((g): g is ImportedGame => g !== null);
+      .filter((g): g is ImportedGame => g !== null)
+      // Lichess treats `max` as a floor (not a ceiling) once a rated/perfType
+      // filter is applied — it rounds up to its internal 25-game page size and
+      // returns the whole last page (e.g. max=60 → 75). Enforce the cap here so
+      // callers never analyze more games than requested. Results are
+      // sort=dateDesc, so slicing keeps the most-recent `max`.
+      .slice(0, opts.max);
 
     if (games.length === 0) throw new NoGamesError(`No standard public games for ${username}`);
     return games;
