@@ -13,6 +13,15 @@ const STAGE_LABEL: Record<string, string> = {
   FAILED: 'Something went wrong.',
 };
 
+/** What to show while the job is still waiting to be picked up by the worker. */
+function queueMessage(queueAhead: number, workerBusy: boolean): string {
+  if (queueAhead > 0) {
+    return `Waiting in queue — ${queueAhead} ${queueAhead === 1 ? 'analysis is' : 'analyses are'} ahead of yours.`;
+  }
+  if (workerBusy) return "You're next — the engine is finishing another analysis.";
+  return 'Starting your analysis…';
+}
+
 /** Map internal job errors to user-friendly messages. */
 function friendlyJobError(raw?: string): string {
   const e = (raw ?? '').toLowerCase();
@@ -30,6 +39,8 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
   const [status, setStatus] = useState('PENDING');
   const [stage, setStage] = useState<string | null>(null);
   const [lichessUser, setLichessUser] = useState<string | null>(null);
+  const [queueAhead, setQueueAhead] = useState(0);
+  const [workerBusy, setWorkerBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,6 +57,8 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
         setStatus(json.data.status);
         setStage(json.data.stage);
         setLichessUser(json.data.lichessUser ?? null);
+        setQueueAhead(json.data.queueAhead ?? 0);
+        setWorkerBusy(Boolean(json.data.workerBusy));
         if (json.data.status === 'DONE' && json.data.reportSlug) {
           router.push(`/report/${json.data.reportSlug}`);
           return;
@@ -76,7 +89,11 @@ export default function AnalyzingPage({ params }: { params: { jobId: string } })
           <h1 className="text-2xl font-semibold">
             Analyzing {lichessUser ? `${lichessUser}'s games` : 'your games'}
           </h1>
-          <p className="mt-2 text-neutral-600">{stage ?? STAGE_LABEL[status] ?? 'Working…'}</p>
+          <p className="mt-2 text-neutral-600">
+            {status === 'PENDING'
+              ? queueMessage(queueAhead, workerBusy)
+              : (stage ?? STAGE_LABEL[status] ?? 'Working…')}
+          </p>
           <p className="mt-8 text-xs text-neutral-400">
             This might take a few minutes depending on number of games and analysis needed. You can
             safely leave — we&apos;ll email your report when it&apos;s ready.

@@ -14,6 +14,26 @@ export async function GET(
   });
   if (!job) return jsonError('Job not found', 404);
 
+  // While the job is still waiting, tell the user how many jobs are ahead of it
+  // and whether the worker is currently busy, so they know it's queued (not
+  // stuck). The worker claims PENDING jobs FIFO by createdAt, so counting
+  // earlier PENDING jobs gives an honest "ahead of you" figure that ticks down.
+  // Only computed for PENDING — no extra queries once the job is in-progress.
+  let queueAhead = 0;
+  let workerBusy = false;
+  if (job.status === 'PENDING') {
+    const [ahead, inProgress] = await Promise.all([
+      prisma.analysisJob.count({
+        where: { status: 'PENDING', createdAt: { lt: job.createdAt } },
+      }),
+      prisma.analysisJob.count({
+        where: { status: { in: ['FETCHING', 'EVALUATING', 'CLASSIFYING', 'GENERATING'] } },
+      }),
+    ]);
+    queueAhead = ahead;
+    workerBusy = inProgress > 0;
+  }
+
   return jsonOk({
     id: job.id,
     status: job.status,
@@ -24,5 +44,7 @@ export async function GET(
     lichessUser: job.source === 'pgn' ? null : job.user.lichessUser,
     error: job.error,
     reportSlug: job.report?.publicSlug ?? null,
+    queueAhead,
+    workerBusy,
   });
 }
