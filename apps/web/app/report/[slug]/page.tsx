@@ -89,7 +89,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
         <BrandLogo height={40} />
       </div>
 
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-brand">
             {profile.source === 'pgn' ? (
