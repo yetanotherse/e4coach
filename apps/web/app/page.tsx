@@ -3,6 +3,7 @@ import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
 import { BrandLogo } from '@/components/BrandLogo';
 import { CoreIdea } from '@/components/CoreIdea';
+import { PositionInsight } from '@/components/PositionInsight';
 
 const STEPS = [
   { title: 'We import your games', body: 'Your recent public Lichess games — no password, no OAuth.' },
@@ -54,6 +55,10 @@ export default function LandingPage({
 
       <section className="mt-16">
         <CoreIdea />
+      </section>
+
+      <section className="mt-16">
+        <PositionInsight />
       </section>
 
       <section className="mt-16">
