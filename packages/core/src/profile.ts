@@ -4,6 +4,7 @@
  * it must never be invented by the model.
  */
 import type { WeaknessCategory } from './taxonomy.js';
+import type { PositionType } from './analysis/structure.js';
 
 /** A short move window around the mistake, for the interactive stepper. */
 export interface ExampleLine {
@@ -47,6 +48,22 @@ export interface WeaknessCategoryStat {
   examples: ErrorInstance[];
 }
 
+/**
+ * How often the user erred in positions exhibiting a given structural type,
+ * relative to their own overall mistake rate. Deterministic cross-tab computed
+ * over ALL scored moves (denominator) and mistakes (numerator).
+ */
+export interface PositionTypeStat {
+  type: PositionType;
+  label: string; // user-facing label (from POSITION_TYPE_META)
+  movesInType: number; // scored user moves whose position had this type
+  mistakesInType: number; // of those, moves that were a mistake/blunder
+  rate: number; // mistakesInType / movesInType (0..1)
+  baselineRate: number; // the player's overall mistake rate (0..1)
+  lift: number; // rate / baselineRate (>1 = errs here more than average)
+  examples: ErrorInstance[]; // up to 3 real positions of this type
+}
+
 export interface WeaknessProfile {
   username: string;
   source: string; // 'lichess' | ...
@@ -58,6 +75,8 @@ export interface WeaknessProfile {
   categories: WeaknessCategoryStat[];
   /** top 3 by estimatedRatingLoss (spec §9.1.7) */
   topWeaknesses: WeaknessCategory[];
+  /** structural contexts where the user errs disproportionately (may be empty) */
+  positionTypes?: PositionTypeStat[];
   engineMeta: { kind: string; version?: string; depth?: number; movetimeMs?: number };
   /** what was actually analyzed — surfaced to the user (spec feedback #6) */
   scope?: AnalysisScope;

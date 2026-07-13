@@ -16,6 +16,8 @@ function gameTypeLabel(scope: AnalysisScope): string | null {
   return `Mixed: ${types.join(', ')}`;
 }
 
+const pct = (x: number): string => `${Math.round(x * 100)}%`;
+
 /** Human label for a job source. */
 function sourceLabel(source: string): string {
   if (source === 'lichess') return 'Lichess';
@@ -165,6 +167,59 @@ export default async function ReportPage({ params }: { params: { slug: string } 
           </section>
         ))}
       </div>
+
+      {profile.positionTypes && profile.positionTypes.length > 0 && (
+        <section className="mt-16">
+          <h2 className="text-xl font-semibold">Where your mistakes cluster</h2>
+          <p className="mt-2 text-neutral-600">
+            The position types where you go wrong more often than your own average — worth
+            targeted study.
+          </p>
+          <div className="mt-6 space-y-10">
+            {profile.positionTypes.map((pt) => (
+              <div key={pt.type}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-brand/10 px-3 py-1 text-sm font-medium text-brand-dark">
+                    {pt.label}
+                  </span>
+                  <span className="text-sm font-semibold text-brand">
+                    {pt.lift.toFixed(1)}× your average
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-neutral-700">
+                  <strong>{pct(pt.rate)}</strong> of your moves in these positions were
+                  mistakes, versus <strong>{pct(pt.baselineRate)}</strong> overall (
+                  {pt.mistakesInType} in {pt.movesInType} such positions).
+                </p>
+                {pt.examples.length > 0 && (
+                  <div className="mt-4 grid gap-6 sm:grid-cols-2">
+                    {pt.examples.map((ex) => {
+                      const g = content.games?.[ex.gameId];
+                      return (
+                        <MoveExample
+                          key={`${pt.type}-${ex.gameId}-${ex.ply}`}
+                          ex={ex}
+                          {...(g
+                            ? {
+                                fullGame: {
+                                  pgn: g.pgn,
+                                  userColor: g.userColor,
+                                  ...(g.event ? { event: g.event } : {}),
+                                  ...(g.speed ? { speed: g.speed } : {}),
+                                  ...(g.timeControl ? { timeControl: g.timeControl } : {}),
+                                },
+                              }
+                            : {})}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-16 print:hidden">
         <FakeDoor reportSlug={params.slug} />

@@ -7,6 +7,7 @@ import type { WeaknessCategory } from '../taxonomy.js';
 import { WEAKNESS_CATEGORIES } from '../taxonomy.js';
 import { ALL_DETECTORS, type GameContext } from '../detectors/index.js';
 import { clamp, normalizeUci } from './cpl.js';
+import { aggregatePositionTypes } from './positionAggregate.js';
 
 const LOW_CONFIDENCE_GAMES = 10; // spec §9.3
 const DEFAULT_MAX_EXAMPLES = 10;
@@ -81,6 +82,11 @@ export function aggregateProfile(input: AggregateInput): WeaknessProfile {
     categories.push({ category: cat, frequency: instances.length, estimatedRatingLoss, examples });
   }
 
+  // Cross-tab: structural contexts where mistakes cluster. Uses every scored
+  // move (denominator, via contexts) and all error instances (examples).
+  const allInstances = [...byCategory.values()].flat();
+  const positionTypes = aggregatePositionTypes(input.contexts, allInstances);
+
   // Rank by estimated rating loss, then frequency, then taxonomy order (stable).
   const ranked = [...categories].sort((a, b) => {
     if (b.estimatedRatingLoss !== a.estimatedRatingLoss)
@@ -97,6 +103,7 @@ export function aggregateProfile(input: AggregateInput): WeaknessProfile {
     lowConfidence: input.contexts.length < LOW_CONFIDENCE_GAMES,
     categories,
     topWeaknesses: ranked.slice(0, TOP_N).map((c) => c.category),
+    ...(positionTypes.length ? { positionTypes } : {}),
     engineMeta: input.engineMeta,
     ...(input.scope ? { scope: input.scope } : {}),
   };
