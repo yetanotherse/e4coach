@@ -53,6 +53,21 @@ describe('LichessGameSource', () => {
     expect(games).toHaveLength(1);
   });
 
+  it('clamps to max when Lichess over-returns (its `max` is a floor under filters)', async () => {
+    // Lichess rounds `max` up to its 25-game page size when a rated/perfType
+    // filter is present (e.g. max=60 → 75). Records are already date-desc, so
+    // we must keep the first `max` and drop the surplus.
+    const records = Array.from({ length: 75 }, (_, i) => ({
+      ...GAME_RECORD,
+      id: `game${String(i).padStart(3, '0')}`,
+    }));
+    const fetchImpl = vi.fn(async () => ndjsonResponse(records)) as unknown as typeof fetch;
+    const games = await source(fetchImpl).fetchRecentGames('mockuser', { max: 60 });
+    expect(games).toHaveLength(60);
+    expect(games[0]!.id).toBe('game000'); // most-recent kept
+    expect(games[59]!.id).toBe('game059'); // surplus (game060..game074) dropped
+  });
+
   it('throws UnknownUserError on 404', async () => {
     const fetchImpl = vi.fn(async () => new Response('', { status: 404 })) as unknown as typeof fetch;
     await expect(source(fetchImpl).fetchRecentGames('nobody', { max: 10 })).rejects.toBeInstanceOf(
