@@ -47,6 +47,51 @@ describe.skipIf(!bin)('StockfishNativeEngine (integration)', () => {
     }
   }, 20_000);
 
+  it('returns ranked alternative lines when MultiPV is requested', async () => {
+    const engine = new StockfishNativeEngine({ binPath: bin!, poolSize: 1 });
+    try {
+      const res = await engine.evaluate(START_FEN, { depth: 12, multiPv: 3 });
+      expect(res.lines).toHaveLength(3);
+      expect(res.lines!.map((l) => l.rank)).toEqual([1, 2, 3]);
+      // Rank 1 must agree with the flat fields single-PV callers read.
+      expect(res.lines![0]!.pv[0]).toBe(res.bestMove);
+      expect(res.lines![0]!.cp).toBe(res.cp);
+      // Ranked worst-to-best from the mover's perspective: rank 1 >= rank 2 >= rank 3.
+      const cps = res.lines!.map((l) => l.cp!);
+      expect(cps[0]!).toBeGreaterThanOrEqual(cps[1]!);
+      expect(cps[1]!).toBeGreaterThanOrEqual(cps[2]!);
+      expect(res.lines!.every((l) => l.pv.length > 0)).toBe(true);
+    } finally {
+      await engine.dispose();
+    }
+  }, 20_000);
+
+  it('caps lines at the number of legal moves', async () => {
+    // Only one legal move: the king must capture the checking queen.
+    const fen = '7k/8/8/8/8/8/5q2/6K1 w - - 0 1';
+    const engine = new StockfishNativeEngine({ binPath: bin!, poolSize: 1 });
+    try {
+      const res = await engine.evaluate(fen, { depth: 8, multiPv: 5 });
+      expect(res.lines!.length).toBeLessThanOrEqual(2);
+      expect(res.bestMove).toBe('g1f2');
+    } finally {
+      await engine.dispose();
+    }
+  }, 20_000);
+
+  it('does not leak MultiPV onto a pooled process reused by a later eval', async () => {
+    // Regression: processes are reused across jobs. A deep MultiPV eval must not
+    // leave the option set for the shallow single-PV evals that follow.
+    const engine = new StockfishNativeEngine({ binPath: bin!, poolSize: 1 });
+    try {
+      await engine.evaluate(START_FEN, { depth: 12, multiPv: 3 });
+      const after = await engine.evaluate(START_FEN, { depth: 12 });
+      expect(after.lines).toBeUndefined();
+    } finally {
+      await engine.dispose();
+    }
+  }, 20_000);
+
   it('is deterministic at a fixed depth (same fen → same eval, even via the pool)', async () => {
     const fen = 'r2q1rk1/1b1nbppp/p2ppn2/1p6/3NP3/1BN1B3/PPP1QPPP/R4RK1 w - - 0 12';
     const engine = new StockfishNativeEngine({ binPath: bin!, poolSize: 3 });
