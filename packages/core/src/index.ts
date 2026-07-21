@@ -15,3 +15,4 @@ export * from './detectors/index.js';
 
 // Report generation prompt + grounding contract
 export * from './prompts/report.js';
+export * from './prompts/explain.js';
