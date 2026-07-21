@@ -6,6 +6,22 @@
 /** Which side the imported user played. */
 export type Color = 'white' | 'black';
 
+/**
+ * One principal variation from a MultiPV search. Rank 1 is the engine's best
+ * move; higher ranks are progressively worse alternatives.
+ */
+export interface EngineLine {
+  /** 1-based UCI multipv index */
+  rank: number;
+  /** centipawns from the side-to-move perspective */
+  cp?: number;
+  /** mate-in-N (positive = mover mates) */
+  mate?: number;
+  /** the variation in UCI, best move first */
+  pv: string[];
+  depth: number;
+}
+
 /** A single engine evaluation of a position. */
 export interface EngineEval {
   /** centipawns from the side-to-move perspective (positive = better for mover) */
@@ -15,6 +31,12 @@ export interface EngineEval {
   bestMove: string;
   pv: string[];
   depth: number;
+  /**
+   * Top-N variations, present only when evaluated with multiPv > 1. The engine
+   * may return FEWER than requested when the position has fewer legal moves —
+   * never assume a length.
+   */
+  lines?: EngineLine[];
 }
 
 /** A game imported from a GameSource (spec §8.3). */

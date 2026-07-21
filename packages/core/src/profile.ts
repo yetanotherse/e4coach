@@ -5,6 +5,7 @@
  */
 import type { WeaknessCategory } from './taxonomy.js';
 import type { PositionType } from './analysis/structure.js';
+import type { Variation } from './analysis/explain.js';
 
 /** A short move window around the mistake, for the interactive stepper. */
 export interface ExampleLine {
@@ -36,6 +37,30 @@ export interface ErrorInstance {
   line?: ExampleLine;
   /** elaborated, factual explanation produced deterministically (not the LLM) */
   note: string;
+  /**
+   * Coaching explanation of WHY the engine's move was better, added by the deep
+   * analysis pass. Absent on reports generated before that pass existed, and
+   * whenever it is disabled — always fall back to `note`.
+   */
+  explanation?: MoveExplanation;
+  /**
+   * Engine lines the reader can step through: how the opponent punishes the
+   * played move, what the engine intended, and other moves that also held.
+   * Stored as start position + SAN only; UCI is re-derivable on the client.
+   */
+  variations?: Variation[];
+}
+
+/** Plain-language coaching prose for one mistake. */
+export interface MoveExplanation {
+  /** what the played move allowed the opponent to do */
+  whatWentWrong: string;
+  /** what the engine's move accomplishes instead */
+  whyBetter: string;
+  /** the transferable lesson */
+  takeaway: string;
+  /** `llm` when narrated by the model, `template` when deterministically rendered */
+  source: 'llm' | 'template';
 }
 
 /** Aggregated stats for one weakness category. */

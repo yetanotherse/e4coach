@@ -32,7 +32,13 @@ async function main(): Promise<void> {
   const deps = {
     gameSource: createGameSource(env),
     engine: createEngine(env),
-    llm: createLlmProvider(env),
+    // Token telemetry: a job now makes ~8 LLM calls (one report + one per
+    // explanation batch) instead of one, so unmetered usage is no longer fine.
+    llm: createLlmProvider(env, {
+      onUsage: ({ model, inputTokens, outputTokens }) => {
+        console.log(`[llm] ${model} ${inputTokens} in / ${outputTokens} out`);
+      },
+    }),
     analytics: createAnalytics(env),
     mailer: createMailer(env),
     appUrl: env.APP_URL,
@@ -41,6 +47,13 @@ async function main(): Promise<void> {
     maxExamples: env.MAX_EXAMPLES_PER_WEAKNESS,
     depth: env.ENGINE_DEPTH,
     movetimeMs: env.ENGINE_MOVETIME_MS,
+    deepen: {
+      enabled: env.DEEP_ANALYSIS_ENABLED,
+      depth: env.DEEP_ANALYSIS_DEPTH,
+      multiPv: env.DEEP_ANALYSIS_MULTIPV,
+      maxPositions: env.DEEP_ANALYSIS_MAX_POSITIONS,
+      maxPvPlies: env.DEEP_ANALYSIS_PV_PLIES,
+    },
   };
 
   console.log('[worker] started', {
@@ -50,6 +63,9 @@ async function main(): Promise<void> {
     engineThreads: env.ENGINE_THREADS,
     engineHash: env.ENGINE_HASH,
     llm: deps.llm.name,
+    deepAnalysis: env.DEEP_ANALYSIS_ENABLED
+      ? `depth ${env.DEEP_ANALYSIS_DEPTH}, multipv ${env.DEEP_ANALYSIS_MULTIPV}, max ${env.DEEP_ANALYSIS_MAX_POSITIONS}`
+      : 'off',
     pollMs: env.WORKER_POLL_INTERVAL_MS,
     maxGamesPerJob: env.MAX_GAMES_PER_JOB,
     maxAnalyzed: env.MAX_ANALYZED_GAMES,
