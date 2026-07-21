@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { ChessBoard } from './ChessBoard';
 import { GameViewer } from './GameViewer';
+import { VariationTabs, type VariationData } from './VariationTabs';
 
 /** Shape of an ErrorInstance example (subset the UI needs). */
 export interface ExampleData {
@@ -20,6 +21,15 @@ export interface ExampleData {
   gameUrl?: string;
   note: string;
   line?: { fens: string[]; sans: string[]; focusIndex: number };
+  /** coaching prose from the deep analysis pass; absent on older reports */
+  explanation?: {
+    whatWentWrong: string;
+    whyBetter: string;
+    takeaway: string;
+    source: 'llm' | 'template';
+  };
+  /** engine lines the reader can step through; absent on older reports */
+  variations?: VariationData[];
 }
 
 /** Was the position already lost before the move? (spec feedback #4) */
@@ -45,6 +55,9 @@ export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: Full
   const boardFen = stepping && line ? line.fens[idx]! : ex.fen;
 
   const showFullGame = Boolean(fullGame) && stepping;
+  // Engine lines take over the board when we have them — they answer "why was
+  // this a mistake?" far better than a single static position with two arrows.
+  const showVariations = !showFullGame && Boolean(ex.variations?.length) && !stepping;
 
   return (
     <figure className="rounded-lg border border-neutral-200 p-3">
@@ -56,6 +69,8 @@ export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: Full
           playedUci={ex.playedMoveUci}
           betterUci={ex.betterMove}
         />
+      ) : showVariations ? (
+        <VariationTabs variations={ex.variations!} orientation={ex.userColor} />
       ) : (
         <div className="mx-auto max-w-[260px]">
           <ChessBoard
@@ -124,7 +139,20 @@ export function MoveExample({ ex, fullGame }: { ex: ExampleData; fullGame?: Full
             </span>
           )}
         </span>
-        <span className="mt-1 block text-neutral-700">{ex.note}</span>
+        {ex.explanation ? (
+          <span className="mt-2 block space-y-1.5 text-neutral-700">
+            <span className="block">{ex.explanation.whatWentWrong}</span>
+            {ex.explanation.whyBetter && (
+              <span className="block">{ex.explanation.whyBetter}</span>
+            )}
+            <span className="block text-neutral-600">
+              <strong className="font-medium">Takeaway:</strong> {ex.explanation.takeaway}
+            </span>
+          </span>
+        ) : (
+          // Reports generated before the deep analysis pass only have `note`.
+          <span className="mt-1 block text-neutral-700">{ex.note}</span>
+        )}
         <span className="mt-1 flex gap-3 text-xs">
           <span className="inline-flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-red-500" /> your move

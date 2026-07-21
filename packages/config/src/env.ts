@@ -48,6 +48,21 @@ const EnvSchema = z.object({
   // Parallel engine processes; set to the CPU-core count to saturate the box.
   ENGINE_POOL_SIZE: z.coerce.number().int().min(1).max(64).default(2),
 
+  // Deep analysis — a second, deeper MultiPV pass over ONLY the mistakes shown
+  // in the report, used to explain why the engine's move was better. Off by
+  // default: it adds real wall-clock time to every job.
+  DEEP_ANALYSIS_ENABLED: boolish.default('false'),
+  // Deeper than ENGINE_DEPTH — these lines are shown to the user, so they need
+  // to be trustworthy several plies in, not just good enough to score CPL.
+  DEEP_ANALYSIS_DEPTH: z.coerce.number().int().min(8).max(30).default(20),
+  // 3 gives the engine's choice plus two alternatives that also held.
+  DEEP_ANALYSIS_MULTIPV: z.coerce.number().int().min(1).max(5).default(3),
+  // The only real bound on this stage's runtime. Each position costs two evals
+  // at DEEP_ANALYSIS_DEPTH, roughly 10-30x a scoring-pass eval.
+  DEEP_ANALYSIS_MAX_POSITIONS: z.coerce.number().int().min(1).max(200).default(40),
+  // Plies of each variation kept for the stepper.
+  DEEP_ANALYSIS_PV_PLIES: z.coerce.number().int().min(2).max(12).default(6),
+
   // Game source
   GAME_SOURCE: z.enum(['mock', 'lichess']).default('mock'),
   LICHESS_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),

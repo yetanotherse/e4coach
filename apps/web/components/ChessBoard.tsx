@@ -6,10 +6,27 @@ import type { Api } from 'chessground/api';
 import type { Key } from 'chessground/types';
 import type { DrawShape } from 'chessground/draw';
 
+/** On-brand arrows: better move = success green, played move = danger red. */
+const BRUSHES = {
+  green: { key: 'g', color: '#16A34A', opacity: 0.9, lineWidth: 10 },
+  red: { key: 'r', color: '#DC2626', opacity: 0.9, lineWidth: 10 },
+  blue: { key: 'b', color: '#2563EB', opacity: 0.9, lineWidth: 10 },
+  yellow: { key: 'y', color: '#D97706', opacity: 0.9, lineWidth: 10 },
+};
+
+function arrow(uci: string | undefined, brush: 'red' | 'green'): DrawShape[] {
+  if (!uci || uci.length < 4) return [];
+  return [{ orig: uci.slice(0, 2) as Key, dest: uci.slice(2, 4) as Key, brush }];
+}
+
 /**
  * Read-only board (spec §6), oriented to the user's side. Optionally draws the
  * played move (red) and the engine's better move (green) as arrows so the
  * mistake reads correctly regardless of which color the user had (feedback #3).
+ *
+ * The board instance is created ONCE and updated in place. Tearing it down on
+ * every prop change (as this used to) destroys chessground's move animation and
+ * is visibly janky when stepping through a variation one ply at a time.
  */
 export function ChessBoard({
   fen,
@@ -25,36 +42,27 @@ export function ChessBoard({
   const ref = useRef<HTMLDivElement>(null);
   const apiRef = useRef<Api | null>(null);
 
+  // Mount once. Config that changes is applied by the effect below.
   useEffect(() => {
     if (!ref.current) return;
-    const shapes: DrawShape[] = [];
-    if (playedUci && playedUci.length >= 4) {
-      shapes.push({ orig: playedUci.slice(0, 2) as Key, dest: playedUci.slice(2, 4) as Key, brush: 'red' });
-    }
-    if (betterUci && betterUci.length >= 4) {
-      shapes.push({ orig: betterUci.slice(0, 2) as Key, dest: betterUci.slice(2, 4) as Key, brush: 'green' });
-    }
     apiRef.current = Chessground(ref.current, {
-      fen: fen.split(' ')[0],
-      orientation,
       viewOnly: true,
       coordinates: true,
-      drawable: {
-        enabled: false,
-        autoShapes: shapes,
-        // On-brand arrows: better move = success green, played move = danger red.
-        brushes: {
-          green: { key: 'g', color: '#16A34A', opacity: 0.9, lineWidth: 10 },
-          red: { key: 'r', color: '#DC2626', opacity: 0.9, lineWidth: 10 },
-          blue: { key: 'b', color: '#2563EB', opacity: 0.9, lineWidth: 10 },
-          yellow: { key: 'y', color: '#D97706', opacity: 0.9, lineWidth: 10 },
-        },
-      },
+      drawable: { enabled: false, brushes: BRUSHES },
     });
     return () => {
       apiRef.current?.destroy();
       apiRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    // Orientation must be set explicitly here — without it, a board for a black
+    // player would silently keep the mount-time default and render flipped.
+    api.set({ fen: fen.split(' ')[0], orientation });
+    api.setAutoShapes([...arrow(playedUci, 'red'), ...arrow(betterUci, 'green')]);
   }, [fen, orientation, playedUci, betterUci]);
 
   return <div ref={ref} className="aspect-square w-full" />;
