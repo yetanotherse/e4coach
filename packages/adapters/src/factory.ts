@@ -16,6 +16,7 @@ import { MockMailer } from './mocks/mockMailer.js';
 import { LichessGameSource } from './lichess/lichessGameSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
+import type { ResilienceOptions } from './llm/resilience.js';
 import { PostHogAnalytics } from './analytics/posthogAnalytics.js';
 import { ResendMailer } from './email/resendMailer.js';
 
@@ -45,13 +46,22 @@ export function createEngine(env: Env): ChessEngine {
   }
 }
 
-export function createLlmProvider(env: Env): LlmProvider {
+/** Optional observability hooks. `onUsage` fires once per successful LLM call. */
+export interface LlmHooks {
+  onUsage?: ResilienceOptions['onUsage'];
+}
+
+export function createLlmProvider(env: Env, hooks: LlmHooks = {}): LlmProvider {
   switch (env.LLM_PROVIDER) {
     case 'mock':
       return new MockLlmProvider();
     case 'gemini':
       if (!env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is required for gemini provider');
-      return new GeminiFlashProvider({ apiKey: env.GEMINI_API_KEY, model: env.LLM_MODEL });
+      return new GeminiFlashProvider({
+        apiKey: env.GEMINI_API_KEY,
+        model: env.LLM_MODEL,
+        ...(hooks.onUsage ? { onUsage: hooks.onUsage } : {}),
+      });
   }
 }
 

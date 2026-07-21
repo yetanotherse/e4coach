@@ -22,6 +22,8 @@ import {
 } from '@chess-coach/core';
 import { prisma, Prisma, type PrismaClient } from '@chess-coach/db';
 import { evaluateGame } from './evaluate.js';
+import { deepenProfile, type DeepenOptions } from './deepen.js';
+import { narrateExplanations } from './explain.js';
 import { generateReport } from './generate.js';
 import { generateSlug } from './slug.js';
 import { sendReportReadyEmail } from './notify.js';
@@ -42,6 +44,8 @@ export interface RunDeps {
   /** fixed search depth — deterministic analysis (preferred over movetime) */
   depth: number;
   movetimeMs: number;
+  /** deep explanation pass; omitted or disabled leaves examples with `note` only */
+  deepen?: DeepenOptions & { enabled: boolean };
 }
 
 /** Per-job selection controls chosen by the user (spec feedback #6). */
@@ -58,6 +62,12 @@ export interface JobRecord {
 }
 
 const DEFAULT_PERF_TYPES = ['blitz', 'rapid', 'classical'];
+
+/** Token spend for the explanation stage, recorded per job for cost tracking. */
+interface LlmTokens {
+  inputTokens: number;
+  outputTokens: number;
+}
 
 /**
  * Sources whose games are pre-inserted as Game rows (loaded from the DB) rather
@@ -143,7 +153,7 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
 
     await setStage(db, job.id, 'CLASSIFYING', 'classifying weaknesses');
     const scope = buildScope(games, contexts.length, skipped, requestedMax, perfTypes);
-    const profile = aggregateProfile({
+    const baseProfile = aggregateProfile({
       username: displayName,
       source: job.source,
       contexts,
@@ -152,6 +162,13 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       maxExamples: deps.maxExamples,
       scope,
     });
+
+    // ── Stage 4b: explain the mistakes we're about to show ──────────
+    // Deeper, MultiPV re-analysis of only the displayed examples, so each one
+    // can say WHY the engine's move was better. Reuses the CLASSIFYING status
+    // (a new JobStatus enum value would need a migration deployed strictly
+    // before the worker) and reports progress through the free-text stage.
+    const { profile, llmTokens } = await explainMistakes(db, job.id, baseProfile, deps);
 
     // ── Stage 5: generate report ────────────────────────────────────
     await setStage(db, job.id, 'GENERATING', 'writing your report');
@@ -176,7 +193,16 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     });
     await db.analysisJob.update({
       where: { id: job.id },
-      data: { status: 'DONE', stage: 'done', engineMeta: { ...engineMeta, evalCount, skipped } },
+      data: {
+        status: 'DONE',
+        stage: 'done',
+        engineMeta: {
+          ...engineMeta,
+          evalCount,
+          skipped,
+          ...(llmTokens ? { llmTokens } : {}),
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
 
     await deps.analytics.capture(distinctId, 'job_completed', {
@@ -204,6 +230,61 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     });
     await deps.analytics.capture(distinctId, 'job_failed', { jobId: job.id, error: message });
     throw err;
+  }
+}
+
+/**
+ * Attach engine-grounded explanations to the examples the report will show.
+ *
+ * Entirely optional: if it is disabled or fails, examples keep their existing
+ * deterministic `note` and the job proceeds. A failure here must never cost the
+ * user their report.
+ */
+async function explainMistakes(
+  db: PrismaClient,
+  jobId: string,
+  profile: WeaknessProfile,
+  deps: RunDeps,
+): Promise<{ profile: WeaknessProfile; llmTokens?: LlmTokens }> {
+  if (!deps.deepen?.enabled) return { profile };
+  try {
+    await db.analysisJob
+      .update({ where: { id: jobId }, data: { stage: 'studying your mistakes' } })
+      .catch(() => {});
+    const started = Date.now();
+    const { profile: enriched, facts, enrichments } = await deepenProfile(
+      profile,
+      deps.engine,
+      deps.deepen,
+      async (done, total) => {
+        await db.analysisJob
+          .update({
+            where: { id: jobId },
+            data: { stage: `studying your mistakes ${done}/${total}` },
+          })
+          .catch(() => {});
+      },
+    );
+    console.log(
+      `[runner] job ${jobId} explained ${facts.size} position(s) in ${Date.now() - started}ms`,
+    );
+
+    // Rephrase the deterministic prose in a coach's voice. Strictly an upgrade:
+    // anything the model cannot safely improve keeps the engine-derived text.
+    const narrated = await narrateExplanations(enriched, facts, deps.llm, enrichments);
+    if (narrated.narrated > 0) {
+      console.log(
+        `[runner] job ${jobId} narrated ${narrated.narrated}/${facts.size} explanation(s) ` +
+          `(${narrated.usage.inputTokens} in / ${narrated.usage.outputTokens} out tokens)`,
+      );
+    }
+    return { profile: narrated.profile, llmTokens: narrated.usage };
+  } catch (err) {
+    console.warn(
+      `[runner] job ${jobId} deep analysis failed, continuing without explanations:`,
+      err instanceof Error ? err.message : err,
+    );
+    return { profile };
   }
 }
 
