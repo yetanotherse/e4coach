@@ -14,7 +14,8 @@ export default async function DashboardPage() {
       <main className="mx-auto max-w-md px-6 py-24">
         <h1 className="text-2xl font-bold">Sign in</h1>
         <p className="mt-2 text-neutral-600">
-          Enter the email you signed up with and we&apos;ll send you a link to your reports.
+          Enter the email you signed up with and we&apos;ll send you a sign-in link or a 6-digit
+          code.
         </p>
         <div className="mt-6">
           <LoginForm />

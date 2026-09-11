@@ -6,13 +6,14 @@
  * breaks.
  */
 import type { Env } from '@chess-coach/config';
-import type { Analytics, ChessEngine, GameSource, LlmProvider, Mailer } from '@chess-coach/core';
+import type { Analytics, Billing, ChessEngine, GameSource, LlmProvider, Mailer } from '@chess-coach/core';
 
 import { MockGameSource } from './mocks/mockGameSource.js';
 import { MockEngine } from './mocks/mockEngine.js';
 import { MockLlmProvider } from './mocks/mockLlm.js';
 import { MockAnalytics } from './mocks/mockAnalytics.js';
 import { MockMailer } from './mocks/mockMailer.js';
+import { MockBilling } from './billing/mockBilling.js';
 import { LichessGameSource } from './lichess/lichessGameSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
@@ -82,5 +83,14 @@ export function createMailer(env: Env): Mailer {
     case 'resend':
       if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is required for resend mailer');
       return new ResendMailer({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM });
+  }
+}
+
+// Billing (plans/phase-2.md 2.5 / D-P2-2): gateway deferred. Only the mock
+// exists; future gateway adapters (stripe/paddle/…) slot in here by env.
+export function createBilling(env: Env): Billing {
+  switch (env.BILLING_PROVIDER) {
+    case 'mock':
+      return new MockBilling();
   }
 }
