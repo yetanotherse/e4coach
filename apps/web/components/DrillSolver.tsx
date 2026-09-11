@@ -6,6 +6,7 @@ import { DrillBoard } from './DrillBoard';
 
 export interface DrillData {
   id: string;
+  type: 'own_game' | 'puzzle';
   theme: string;
   themeName: string;
   fen: string;
@@ -106,6 +107,12 @@ export function DrillSolver({ drill }: { drill: DrillData }) {
         solutionUci={solved || showHint ? drill.solutionUci : undefined}
         onMove={onMove}
       />
+
+      {drill.type === 'puzzle' && (
+        <p className="mt-2 text-center text-xs text-neutral-400">
+          Position from the Lichess community puzzle database (CC BY-SA).
+        </p>
+      )}
 
       {phase === 'wrong' && (
         <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -5,21 +5,23 @@
  */
 import type { WeaknessCategory } from '../taxonomy.js';
 
-/** One position to re-solve, derived from a report example (own games, 2.2a). */
+/** One position to re-solve: from the user's own games, or from the Lichess puzzle DB. */
 export interface DrillDraft {
-  type: 'own_game';
+  type: 'own_game' | 'puzzle';
   theme: WeaknessCategory;
-  /** position BEFORE the mistake - the user's move to find */
+  /** position BEFORE the mistake — or the puzzle's start position */
   fen: string;
   sideToMove: 'white' | 'black';
-  /** engine's better move */
+  /** engine's better move — or the puzzle's first solution move (UCI) */
   solutionUci: string;
   solutionSan?: string;
-  /** what the user actually played (revealed in feedback) */
+  /** what the user actually played (own_game only; puzzle drills have none) */
   playedMoveSan?: string;
   gameId?: string;
-  /** deterministic factual note from the report (shown after solving) */
+  /** deterministic factual note from the report (own_game only) */
   note?: string;
+  /** Lichess puzzle id (puzzle drills only) */
+  puzzleId?: string;
 }
 
 /** One focus theme of a weekly plan, with its coach-voiced goal. */
@@ -39,8 +41,15 @@ export interface PlanOptions {
   now?: Date;
   /** how many weakness themes to focus on (default 2) */
   maxThemes?: number;
-  /** drills per theme (2.2a cap; 2.2b mixes puzzle drills in) */
+  /** own-game drills per theme (2.2a cap) */
   drillsPerTheme?: number;
+  /**
+   * Puzzle candidates by theme (2.2b); up to `puzzlesPerTheme` are appended
+   * after the theme's own-game drills.
+   */
+  puzzlesByTheme?: Partial<Record<string, PuzzleCandidate[]>>;
+  /** puzzle drills per theme (default 2) */
+  puzzlesPerTheme?: number;
 }
 
 /** Drill counts a goal template can reference. */
@@ -49,4 +58,17 @@ export interface GoalFacts {
   displayName: string;
   instanceCount: number;
   drillCount: number;
+}
+
+/**
+ * A thematic master/puzzle position (Lichess puzzle DB slice, 2.2b), fetched
+ * by the worker and handed to the assembler as pure data.
+ */
+export interface PuzzleCandidate {
+  externalId: string;
+  fen: string;
+  /** first move of the puzzle's solution line (UCI) */
+  solutionUci: string;
+  solutionSan?: string;
+  rating: number;
 }

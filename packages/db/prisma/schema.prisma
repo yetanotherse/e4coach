@@ -190,6 +190,7 @@ model Drill {
   solutionSan   String?
   playedMoveSan String? // what the user actually played (revealed feedback)
   gameId        String? // source game id (ties to the report example)
+  puzzleId      String? // Lichess puzzle id (type = 'puzzle', plans/phase-2.md 2.2b)
   note          String? // deterministic factual note from the report
   attempts      DrillAttempt[]
   planItems     PlanItem[]
@@ -212,4 +213,33 @@ model DrillAttempt {
 
   @@index([drillId])
   @@index([userId])
+}
+
+// Lichess puzzle DB slice (plans/phase-2.md 2.2b), ingested by the theme-mapped
+// script in apps/worker/scripts. Populated at deploy time, read by plan
+// generation to mix thematic master-position drills into weekly plans.
+model Puzzle {
+  id          String   @id @default(cuid())
+  externalId  String   @unique // Lichess puzzle id
+  fen         String   // start position; the side to move solves
+  solutionUci String   // first move of the solution line (UCI)
+  line        String   // full solution line (UCI, space-separated)
+  rating      Int      // puzzle difficulty (approx. playing strength)
+  themes      String // space-separated Lichess theme tags (raw, for debugging)
+  category    String // mapped WeaknessCategory
+  createdAt   DateTime @default(now())
+
+  @@index([category, rating])
+}
+
+// Engine-eval cache (plans/phase-2.md 2.2b): fixed-depth evals are
+// deterministic, so (fen, depth, kind) -> eval is safe to persist across jobs.
+model EvalCache {
+  fen      String
+  depth    Int
+  kind     String // engine kind (adapter name) — evals differ per engine
+  evalJson Json // EngineEval
+  createdAt DateTime @default(now())
+
+  @@id([fen, depth, kind])
 }

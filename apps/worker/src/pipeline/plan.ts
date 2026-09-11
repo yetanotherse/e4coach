@@ -11,14 +11,21 @@ import {
   buildPlanDraft,
   buildPlanMessages,
   CATEGORY_META,
+  DEFAULT_MAX_THEMES,
   PLAN_JSON_SCHEMA,
   LlmPlanSchema,
   type GoalFacts,
   type PlanDraft,
+  type PuzzleCandidate,
   type WeaknessProfile,
+  type WeaknessCategory,
   type LlmProvider,
 } from '@chess-coach/core';
 import type { PrismaClient } from '@chess-coach/db';
+
+/** Rating band for puzzle drills: the adult-improver beachhead (spec §1). */
+const PUZZLE_RATING_MIN = 800;
+const PUZZLE_RATING_MAX = 1600;
 
 export interface GeneratePlanInput {
   userId: string;
@@ -36,7 +43,11 @@ export async function generateTrainingPlan(
   llm: LlmProvider,
   now: Date = new Date(),
 ): Promise<string | null> {
-  const draft = buildPlanDraft(input.profile, { now });
+  const focusThemes = input.profile.topWeaknesses.slice(0, DEFAULT_MAX_THEMES);
+  const draft = buildPlanDraft(input.profile, {
+    now,
+    puzzlesByTheme: await fetchPuzzleCandidates(db, focusThemes),
+  });
   if (draft.items.length === 0) {
     console.log('[plan] no drillable weaknesses — no plan generated');
     return null;
@@ -73,13 +84,16 @@ export async function generateTrainingPlan(
   for (const item of plan.items) {
     const drillsForTheme = draft.items.find((d) => d.theme === item.theme)?.drills ?? [];
     for (const drill of drillsForTheme) {
+      // Puzzle drills dedupe on the puzzle id; own-game drills on the position.
       const existing = await db.drill.findFirst({
-        where: {
-          userId: input.userId,
-          theme: drill.theme,
-          fen: drill.fen,
-          solutionUci: drill.solutionUci,
-        },
+        where: drill.puzzleId
+          ? { userId: input.userId, puzzleId: drill.puzzleId }
+          : {
+              userId: input.userId,
+              theme: drill.theme,
+              fen: drill.fen,
+              solutionUci: drill.solutionUci,
+            },
         select: { id: true },
       });
       const drillId =
@@ -96,6 +110,7 @@ export async function generateTrainingPlan(
               ...(drill.solutionSan ? { solutionSan: drill.solutionSan } : {}),
               ...(drill.playedMoveSan ? { playedMoveSan: drill.playedMoveSan } : {}),
               ...(drill.gameId ? { gameId: drill.gameId } : {}),
+              ...(drill.puzzleId ? { puzzleId: drill.puzzleId } : {}),
               ...(drill.note ? { note: drill.note } : {}),
             },
             select: { id: true },
@@ -113,8 +128,39 @@ export async function generateTrainingPlan(
   return plan.id;
 }
 
-/** Try to rephrase the template goals with the LLM; fall back on any failure. */
-async function phraseGoals(
+/**
+ * Thematic puzzle candidates per focus theme (plans/phase-2.md 2.2b), drawn
+ * from the ingested Lichess puzzle slice. A deterministic-ish random offset
+ * varies the pool between analyses without a DB-level shuffle. Best effort:
+ * an empty/unavailable puzzle table simply yields no puzzle drills.
+ */
+async function fetchPuzzleCandidates(
+  db: PrismaClient,
+  themes: readonly WeaknessCategory[],
+): Promise<Partial<Record<WeaknessCategory, PuzzleCandidate[]>>> {
+  const out: Partial<Record<WeaknessCategory, PuzzleCandidate[]>> = {};
+  for (const theme of themes) {
+    try {
+      const where = { category: theme, rating: { gte: PUZZLE_RATING_MIN, lte: PUZZLE_RATING_MAX } };
+      const count = await db.puzzle.count({ where });
+      if (count === 0) continue;
+      const take = 8; // a little slack above the assembler's per-theme cap
+      const skip = count > take ? Math.floor(Math.random() * (count - take)) : 0;
+      const rows = await db.puzzle.findMany({ where, orderBy: { externalId: 'asc' }, skip, take });
+      out[theme] = rows.map((r) => ({
+        externalId: r.externalId,
+        fen: r.fen,
+        solutionUci: r.solutionUci,
+        rating: r.rating,
+      }));
+    } catch (err) {
+      console.warn(`[plan] puzzle candidates for ${theme} unavailable:`, err instanceof Error ? err.message : err);
+    }
+  }
+  return out;
+}
+
+/** Try to rephrase the template goals with the LLM; fall back on any failure. */async function phraseGoals(
   draft: PlanDraft,
   profile: WeaknessProfile,
   llm: LlmProvider,

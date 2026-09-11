@@ -6,12 +6,18 @@
  */
 import type { ChessEngine, EngineEval, ImportedGame } from '@chess-coach/core';
 import { type EvalLookup, type ParsedGame } from '@chess-coach/core';
+import type { EvalCachePort } from './evalCache.js';
 
 export interface EvaluateOptions {
   /** fixed search depth — deterministic (preferred) */
   depth?: number;
   /** time budget — non-deterministic fallback when depth is not set */
   movetimeMs?: number;
+  /**
+   * Cross-job eval cache (plans/phase-2.md 2.2b). Only effective when a fixed
+   * depth is set — movetime evals are non-deterministic and never cached.
+   */
+  evalCache?: EvalCachePort;
 }
 
 /**
@@ -50,9 +56,24 @@ export async function evaluateGame(
   // concurrency to poolSize. Evaluating serially here would leave every pooled
   // engine but one idle (poolSize has no effect). Each FEN is independent and
   // deterministic (ucinewgame + fixed depth), so order does not matter.
-  const toEval = [...needed].filter((fen) => !cache.has(fen));
+  let toEval = [...needed].filter((fen) => !cache.has(fen));
+
+  // Cross-job cache hits (fixed depth only — deterministic, reproducible).
+  if (opts.evalCache && opts.depth) {
+    const hits = await Promise.all(
+      toEval.map(async (fen) => ({ fen, hit: await opts.evalCache!.get(fen) })),
+    );
+    for (const { fen, hit } of hits) {
+      if (hit) cache.set(fen, hit);
+    }
+    toEval = toEval.filter((fen) => !cache.has(fen));
+  }
+
   const results = await Promise.all(toEval.map((fen) => engine.evaluate(fen, evalOpts)));
   toEval.forEach((fen, i) => cache.set(fen, results[i]!));
+  if (opts.evalCache && opts.depth) {
+    await Promise.all(toEval.map((fen, i) => opts.evalCache!.set(fen, results[i]!)));
+  }
 
   return { lookup: (fen: string) => cache.get(fen), evalCount: toEval.length };
 }

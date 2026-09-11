@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { WeaknessProfile } from '../profile.js';
 import type { ErrorInstance } from '../profile.js';
-import { buildPlanDraft, weekStartFor, templateGoal, DEFAULT_MAX_THEMES } from './assemble.js';
+import {
+  buildPlanDraft,
+  weekStartFor,
+  templateGoal,
+  sideToMoveOf,
+  sanForUci,
+  DEFAULT_MAX_THEMES,
+} from './assemble.js';
 
 const FEN_1 = 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1';
 const FEN_2 = 'r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1';
@@ -162,5 +169,84 @@ describe('templateGoal', () => {
     });
     expect(goal).toContain('undefended');
     expect(goal).toContain('5 positions');
+  });
+});
+
+describe('puzzle mixing (2.2b)', () => {
+  const p = profile({
+    topWeaknesses: ['HANGING_PIECE', 'MISSED_TACTIC'],
+    categories: [
+      {
+        category: 'HANGING_PIECE',
+        frequency: 6,
+        estimatedRatingLoss: 90,
+        examples: [example(), example({ fen: FEN_2, gameId: 'g2', ply: 31, moveNumber: 16 })],
+      },
+      {
+        category: 'MISSED_TACTIC',
+        frequency: 3,
+        estimatedRatingLoss: 40,
+        examples: [example({ category: 'MISSED_TACTIC', fen: FEN_2, gameId: 'g3' })],
+      },
+    ],
+  });
+  const puzzles = {
+    HANGING_PIECE: [
+      { externalId: 'pz1', fen: FEN_2, solutionUci: 'a2a4', rating: 1200 },
+      { externalId: 'pz2', fen: FEN_1, solutionUci: 'b1c3', rating: 1300 },
+      { externalId: 'pz3', fen: FEN_1, solutionUci: 'c2c4', rating: 1100 },
+    ],
+  };
+
+  it('appends up to puzzlesPerTheme puzzle drills after own-game drills', () => {
+    const draft = buildPlanDraft(p, { puzzlesByTheme: puzzles, puzzlesPerTheme: 2 });
+    const drills = draft.items[0]!.drills;
+    expect(drills).toHaveLength(4); // 2 own + 2 puzzles (pz3 capped)
+    expect(drills.slice(2).map((d) => d.puzzleId)).toEqual(['pz1', 'pz2']);
+    expect(drills[2]!.type).toBe('puzzle');
+    expect(drills[0]!.type).toBe('own_game');
+  });
+
+  it('derives puzzle side to move from the FEN and fills solution SAN', () => {
+    const draft = buildPlanDraft(p, { puzzlesByTheme: puzzles, puzzlesPerTheme: 3 });
+    const pz = draft.items[0]!.drills[2]!;
+    expect(pz.sideToMove).toBe('white'); // FEN_2 turn field
+    expect(pz.solutionSan).toBeTruthy(); // SAN computed via chess.js
+    expect(pz.gameId).toBeUndefined();
+    expect(pz.playedMoveSan).toBeUndefined();
+  });
+
+  it('keeps a theme with no own-game examples but puzzle candidates', () => {
+    const onlyPuzzles = profile({
+      topWeaknesses: ['ENDGAME_TECHNIQUE'],
+      categories: [],
+    });
+    const draft = buildPlanDraft(onlyPuzzles, {
+      puzzlesByTheme: {
+        ENDGAME_TECHNIQUE: [{ externalId: 'pz9', fen: FEN_1, solutionUci: 'a2a3', rating: 1000 }],
+      },
+    });
+    expect(draft.items).toHaveLength(1);
+    expect(draft.items[0]!.drills).toHaveLength(1);
+    expect(draft.items[0]!.drills[0]!.type).toBe('puzzle');
+  });
+
+  it('goal counts include puzzle drills', () => {
+    const draft = buildPlanDraft(p, { puzzlesByTheme: puzzles, puzzlesPerTheme: 2 });
+    expect(draft.items[0]!.goal).toContain('4 positions');
+  });
+});
+
+describe('helpers', () => {
+  it('sideToMoveOf reads the FEN turn field', () => {
+    expect(sideToMoveOf(FEN_1)).toBe('white');
+    expect(sideToMoveOf(FEN_1.replace(' w ', ' b '))).toBe('black');
+  });
+
+  it('sanForUci converts UCI to SAN on a position', () => {
+    // Starting position: e2e4 is e4.
+    expect(sanForUci('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'e2e4')).toBe('e4');
+    expect(sanForUci('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'e2e4q')).toBe('e4'); // promotion ignored when N/A
+    expect(sanForUci('not a fen', 'e2e4')).toBeUndefined();
   });
 });

@@ -14,6 +14,7 @@ import {
 } from '@chess-coach/adapters';
 import { prisma } from '@chess-coach/db';
 import { runPollLoop } from './pipeline/poller.js';
+import { createDbEvalCache } from './pipeline/evalCache.js';
 
 /** Host (and db name) of a Postgres URL, with credentials stripped, for logs. */
 function dbTarget(url: string): string {
@@ -36,10 +37,13 @@ async function main(): Promise<void> {
     Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV, tracesSampleRate: 0 });
   }
 
+  const engine = createEngine(env);
   const deps = {
     gameSource: createGameSourceFor(env, 'lichess'),
     chessComSource: createGameSourceFor(env, 'chesscom'),
-    engine: createEngine(env),
+    engine,
+    // Cross-job eval cache: only meaningful with a fixed depth (deterministic).
+    evalCache: createDbEvalCache(prisma, { kind: engine.name, depth: env.ENGINE_DEPTH }),
     // Token telemetry: a job now makes ~8 LLM calls (one report + one per
     // explanation batch) instead of one, so unmetered usage is no longer fine.
     llm: createLlmProvider(env, {
