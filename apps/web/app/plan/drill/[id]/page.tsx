@@ -8,7 +8,13 @@ import { DrillSolver, type DrillData } from '@/components/DrillSolver';
 export const dynamic = 'force-dynamic';
 
 /** One drill, owned by the signed-in user only (plans/phase-2.md 2.2a). */
-export default async function DrillPage({ params }: { params: { id: string } }) {
+export default async function DrillPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams?: { from?: string };
+}) {
   const userId = getSessionUserId();
   if (!userId) {
     return (
@@ -41,7 +47,7 @@ export default async function DrillPage({ params }: { params: { id: string } }) 
 
   return (
     <main>
-      <DrillSolver drill={drill} />
+      <DrillSolver drill={drill} backHref={searchParams?.from === 'review' ? '/review' : '/plan'} />
     </main>
   );
 }

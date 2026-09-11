@@ -18,7 +18,8 @@ export type AnalyticsEvent =
   | 'feedback_submitted'
   // Phase 2 coaching events (plans/phase-2.md)
   | 'drill_attempted'
-  | 'drill_solved';
+  | 'drill_solved'
+  | 'review_completed';
 
 export interface Analytics {
   readonly name: string;

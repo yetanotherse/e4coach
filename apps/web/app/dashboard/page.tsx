@@ -46,6 +46,9 @@ export default async function DashboardPage() {
   }
 
   const activePlan = user.trainingPlans[0];
+  const dueCount = await prisma.drill.count({
+    where: { userId, dueAt: { lte: new Date() } },
+  });
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
@@ -78,6 +81,21 @@ export default async function DashboardPage() {
             </span>
           </span>
           <span className="text-brand">Open →</span>
+        </Link>
+      )}
+
+      {dueCount > 0 && (
+        <Link
+          href="/review"
+          className="mt-4 flex items-center justify-between rounded-lg border border-neutral-300 bg-white px-4 py-4 hover:border-brand"
+        >
+          <span>
+            <span className="block font-semibold">Review due drills</span>
+            <span className="text-sm text-neutral-500">
+              {dueCount} drill{dueCount === 1 ? '' : 's'} scheduled for review by spaced repetition
+            </span>
+          </span>
+          <span className="text-brand">Review →</span>
         </Link>
       )}
 

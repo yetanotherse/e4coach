@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { dueAtFor, isDue, nextSrsState } from '@chess-coach/core';
 import { analytics, jsonError, jsonOk, prisma } from '@/lib/server';
 import { getSessionUserId } from '@/lib/auth';
 
@@ -12,8 +13,16 @@ const AttemptSchema = z.object({
  * POST /api/drills/:id/attempt — record one solve attempt (plans/phase-2.md
  * 2.2a). The drill must belong to the signed-in user; the session provides the
  * user, never the body.
+ *
+ * A successful attempt also advances the drill's SM-2-lite schedule
+ * (plans/phase-2.md 2.3): failed tries since the last review count as lapses,
+ * so a clean solve extends the interval and a grind-out solve resets it. A
+ * solve of a due drill additionally emits `review_completed`.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }): Promise<Response> {
+export async function POST(
+  req: Request,
+  { params }: { params: { id: string } },
+): Promise<Response> {
   const userId = getSessionUserId();
   if (!userId) return jsonError('Not signed in', 401);
 
@@ -28,13 +37,28 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const drill = await prisma.drill.findUnique({
     where: { id: params.id },
-    select: { id: true, userId: true, theme: true },
+    select: {
+      id: true,
+      userId: true,
+      theme: true,
+      intervalDays: true,
+      ease: true,
+      reviewCount: true,
+      dueAt: true,
+      lastReviewedAt: true,
+    },
   });
   if (!drill || drill.userId !== userId) return jsonError('Drill not found', 404);
 
   const { solved, playedUci, timeSpentMs } = parsed.data;
   await prisma.drillAttempt.create({
-    data: { drillId: drill.id, userId, solved, ...(playedUci ? { playedUci } : {}), ...(timeSpentMs ? { timeSpentMs } : {}) },
+    data: {
+      drillId: drill.id,
+      userId,
+      solved,
+      ...(playedUci ? { playedUci } : {}),
+      ...(timeSpentMs ? { timeSpentMs } : {}),
+    },
   });
 
   const user = await prisma.user.findUnique({
@@ -48,6 +72,41 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     ...(playedUci ? { playedUci } : {}),
     ...(timeSpentMs ? { timeSpentMs } : {}),
   });
+
+  if (solved) {
+    const wasDue = isDue(drill.dueAt, new Date());
+    const lapses = await prisma.drillAttempt.count({
+      where: {
+        drillId: drill.id,
+        solved: false,
+        ...(drill.lastReviewedAt ? { createdAt: { gt: drill.lastReviewedAt } } : {}),
+      },
+    });
+    const srs = nextSrsState(
+      { intervalDays: drill.intervalDays, ease: drill.ease, reviewCount: drill.reviewCount },
+      { lapses },
+    );
+    const now = new Date();
+    await prisma.drill.update({
+      where: { id: drill.id },
+      data: {
+        intervalDays: srs.intervalDays,
+        ease: srs.ease,
+        reviewCount: srs.reviewCount,
+        dueAt: dueAtFor(now, srs.intervalDays),
+        lastReviewedAt: now,
+      },
+    });
+    if (wasDue) {
+      await analytics.capture(distinctId, 'review_completed', {
+        drillId: drill.id,
+        theme: drill.theme,
+        lapses,
+        nextIntervalDays: srs.intervalDays,
+        reviewCount: srs.reviewCount,
+      });
+    }
+  }
 
   return jsonOk({ recorded: true }, 201);
 }
