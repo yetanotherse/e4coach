@@ -26,7 +26,15 @@ export default async function DashboardPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { reports: { orderBy: { createdAt: 'desc' } } },
+    include: {
+      reports: { orderBy: { createdAt: 'desc' } },
+      trainingPlans: {
+        where: { status: 'active' },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: { items: { select: { id: true } } },
+      },
+    },
   });
 
   if (!user) {
@@ -36,6 +44,8 @@ export default async function DashboardPage() {
       </main>
     );
   }
+
+  const activePlan = user.trainingPlans[0];
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
@@ -53,6 +63,23 @@ export default async function DashboardPage() {
         </div>
         <DashboardActions lichessUser={user.lichessUser} chessComUser={user.chessComUser} />
       </div>
+
+      {activePlan && (
+        <Link
+          href="/plan"
+          className="mt-8 flex items-center justify-between rounded-lg border border-brand bg-brand/5 px-4 py-4 hover:bg-brand/10"
+        >
+          <span>
+            <span className="block font-semibold">This week&apos;s training plan</span>
+            <span className="text-sm text-neutral-500">
+              {activePlan.items.length > 0
+                ? `${activePlan.items.length} focus theme${activePlan.items.length > 1 ? 's' : ''} from your latest report`
+                : 'Built from your latest report'}
+            </span>
+          </span>
+          <span className="text-brand">Open →</span>
+        </Link>
+      )}
 
       <ul className="mt-10 space-y-3">
         {user.reports.length === 0 && (

@@ -47,6 +47,11 @@
 
 ## 2.2 — Training plans + drills (the core value; largest)
 
+> **Decision (owner-confirmed 2026-09): 2.2 is split into two independently shippable halves.**
+> - **2.2a — Own-game plans & drills:** `TrainingPlan`/`PlanItem`/`Drill`/`DrillAttempt` schema; deterministic plan generator (WeaknessProfile → weekly plan, template goals with optional LLM phrasing behind the existing port); drills sourced from the user's own game mistakes (report examples → positions); plan page + Chessground solve UI. **Shipped first.**
+> - **2.2b — Puzzle drills + polish:** Lichess puzzle DB ingestion (theme-tag filtered slice → `Puzzle` table), thematic master-position drills mixed into weekly plans, drill scoring/accuracy feedback, eval cache (`EvalCache`) for drill re-evaluation.
+> Rationale: 2.2a delivers the full coach loop (profile → plan → drill → solve) on data we already have; 2.2b adds the external content slice without blocking the core loop.
+
 1. **Schema:** `TrainingPlan` (userId, weekStart, sourceReportId, status), `PlanItem` (theme/taxonomy id, goal prose, drill refs), `Drill` (userId, type `own_game | puzzle`, sourceGameId/puzzleId, fen, solution line, taxonomy theme), `DrillAttempt` (drillId, solved, moveAccuracy, timeSpent).
 2. **Plan generator** (`packages/core`): WeaknessProfile → weekly plan (top 2 themes × 4–6 drills each); LLM (existing `LlmProvider` port, JSON-schema, grounding contract) writes goals/motivation only; deterministic assembly + template fallback.
 3. **Own-game drills:** reuse stored `Game` rows + `ErrorInstance` examples; solve flow = position FEN + "find the move you missed", feedback via existing engine eval + `explain.ts` narration.

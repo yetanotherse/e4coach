@@ -25,6 +25,7 @@ import { evaluateGame } from './evaluate.js';
 import { deepenProfile, type DeepenOptions } from './deepen.js';
 import { narrateExplanations } from './explain.js';
 import { generateReport } from './generate.js';
+import { generateTrainingPlan } from './plan.js';
 import { generateSlug } from './slug.js';
 import { sendReportReadyEmail } from './notify.js';
 
@@ -195,7 +196,7 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
 
     // ── Stage 6: persist ────────────────────────────────────────────
     const slug = generateSlug();
-    await db.report.create({
+    const report = await db.report.create({
       data: {
         userId: user.id,
         jobId: job.id,
@@ -225,6 +226,22 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       movesScored,
       skipped,
     });
+
+    // ── Stage 7: this week's training plan (optional upgrade) ──────
+    // Built from the same profile; failure here must not fail the job (the
+    // report is already persisted). The plan page reads it via the report.
+    try {
+      await generateTrainingPlan(
+        db,
+        { userId: user.id, profile, reportId: report.id },
+        deps.llm,
+      );
+    } catch (err) {
+      console.warn(
+        `[runner] job ${job.id} plan generation failed (report unaffected):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
 
     // Notify the user their report is ready. Email failure must not fail the job.
     try {

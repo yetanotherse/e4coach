@@ -1,0 +1,157 @@
+/**
+ * Training-plan generation (plans/phase-2.md 2.2a). Runs after a report is
+ * persisted: assemble the weekly plan from the profile (deterministic), try to
+ * rephrase the goals with the LLM (optional, template fallback), then persist
+ * plan + items + drills. Drills are user-owned and deduped by
+ * (user, theme, fen, solution) so re-analysis re-links existing drills instead
+ * of duplicating them, which keeps attempt history stable for SRS (2.3).
+ * A failure here must never fail the analysis job — the report is the product.
+ */
+import {
+  buildPlanDraft,
+  buildPlanMessages,
+  CATEGORY_META,
+  PLAN_JSON_SCHEMA,
+  LlmPlanSchema,
+  type GoalFacts,
+  type PlanDraft,
+  type WeaknessProfile,
+  type LlmProvider,
+} from '@chess-coach/core';
+import type { PrismaClient } from '@chess-coach/db';
+
+export interface GeneratePlanInput {
+  userId: string;
+  profile: WeaknessProfile;
+  reportId: string;
+}
+
+/**
+ * Upsert this week's plan. Same-week plans are marked superseded (only one
+ * active per user+week); drills are deduped and re-linked to the new items.
+ */
+export async function generateTrainingPlan(
+  db: PrismaClient,
+  input: { userId: string; profile: WeaknessProfile; reportId: string },
+  llm: LlmProvider,
+  now: Date = new Date(),
+): Promise<string | null> {
+  const draft = buildPlanDraft(input.profile, { now });
+  if (draft.items.length === 0) {
+    console.log('[plan] no drillable weaknesses — no plan generated');
+    return null;
+  }
+
+  const items = await phraseGoals(draft, input.profile, llm);
+
+  // Supersede any other active plan for the same week, then create the new one.
+  await db.trainingPlan.updateMany({
+    where: {
+      userId: input.userId,
+      weekStart: draft.weekStart,
+      status: 'active',
+    },
+    data: { status: 'superseded' },
+  });
+
+  const plan = await db.trainingPlan.create({
+    data: {
+      userId: input.userId,
+      weekStart: draft.weekStart,
+      sourceReportId: input.reportId,
+      status: 'active',
+      items: {
+        create: items.map((item) => ({
+          theme: item.theme,
+          goal: item.goal,
+        })),
+      },
+    },
+    include: { items: true },
+  });
+
+  for (const item of plan.items) {
+    const drillsForTheme = draft.items.find((d) => d.theme === item.theme)?.drills ?? [];
+    for (const drill of drillsForTheme) {
+      const existing = await db.drill.findFirst({
+        where: {
+          userId: input.userId,
+          theme: drill.theme,
+          fen: drill.fen,
+          solutionUci: drill.solutionUci,
+        },
+        select: { id: true },
+      });
+      const drillId =
+        existing?.id ??
+        (
+          await db.drill.create({
+            data: {
+              userId: input.userId,
+              type: drill.type,
+              theme: drill.theme,
+              fen: drill.fen,
+              sideToMove: drill.sideToMove,
+              solutionUci: drill.solutionUci,
+              ...(drill.solutionSan ? { solutionSan: drill.solutionSan } : {}),
+              ...(drill.playedMoveSan ? { playedMoveSan: drill.playedMoveSan } : {}),
+              ...(drill.gameId ? { gameId: drill.gameId } : {}),
+              ...(drill.note ? { note: drill.note } : {}),
+            },
+            select: { id: true },
+          })
+        ).id;
+      await db.planItem.update({
+        where: { id: item.id },
+        data: { drills: { connect: { id: drillId } } },
+      });
+    }
+  }
+
+  const drillTotal = draft.items.reduce((n, i) => n + i.drills.length, 0);
+  console.log(`[plan] plan ${plan.id} created (${items.length} themes, ${drillTotal} drills)`);
+  return plan.id;
+}
+
+/** Try to rephrase the template goals with the LLM; fall back on any failure. */
+async function phraseGoals(
+  draft: PlanDraft,
+  profile: WeaknessProfile,
+  llm: LlmProvider,
+): Promise<Array<{ theme: string; goal: string }>> {
+  const template = draft.items.map((item) => ({
+    theme: item.theme as string,
+    goal: item.goal,
+  }));
+  try {
+    const facts: GoalFacts[] = draft.items.map((item) => ({
+      theme: item.theme,
+      displayName: CATEGORY_META[item.theme].displayName,
+      instanceCount: profile.categories.find((c) => c.category === item.theme)?.frequency ?? 0,
+      drillCount: item.drills.length,
+    }));
+    const res = await llm.generate(buildPlanMessages(facts), {
+      responseFormat: 'json',
+      jsonSchema: PLAN_JSON_SCHEMA as unknown as Record<string, unknown>,
+      metadata: { purpose: 'plan-goals' },
+    });
+    const parsed = LlmPlanSchema.safeParse(res.parsed ?? JSON.parse(res.text));
+    if (!parsed.success) return template;
+    return mergeOnlyKnownThemes(template, parsed.data);
+  } catch (err) {
+    console.warn('[plan] LLM goal phrasing failed, using template goals:', err instanceof Error ? err.message : err);
+    return template;
+  }
+}
+
+/** Only accept goals for themes that are actually in the draft. */
+function mergeOnlyKnownThemes(
+  template: Array<{ theme: string; goal: string }>,
+  llm: { goals: Array<{ theme: string; goal: string }> },
+): Array<{ theme: string; goal: string }> {
+  const byTheme = new Map(llm.goals.map((g) => [g.theme, g.goal]));
+  return template.map((t) => {
+    const goal = byTheme.get(t.theme);
+    return goal ? { ...t, goal } : t;
+  });
+}
