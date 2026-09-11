@@ -91,9 +91,17 @@
 
 **Verification done:** 14 SRS unit tests + 5 plan-generation tests (resurfacing selection, caps, dedupe re-link preserves SRS state); 284 tests + lint + typecheck + web build green; migration deployed to Supabase; live smoke script (`apps/worker/scripts/srsSmoke.ts`, cleans up after itself): new drill due immediately → clean solve +1d → grind solve ease 2.3/reset → re-learn → second clean +3d, dueAt/lastReviewedAt persisted, selector filters by theme/excludes linked.
 
-## 2.4 — Accountability loop
+## 2.4 — Accountability loop *(DONE 2026-09)*
 
-- `Streak`/`CheckIn` models, weekly check-in flow, rating tracking (Lichess rating history; Chess.com equivalent), simple progress chart, weekly nudge email via existing `Mailer` port.
+1. **Schema** ✅ — migration `0000000000009_accountability`: `Streak` (one per user; current/longest streak, `lastCheckInWeekStart`, `lastNudgeWeekStart` for nudge idempotency), `CheckIn` (unique per user+weekStart, Monday 00:00 UTC — same week math as plans), `RatingSnapshot` (unique per user+source+perf+ratedAt → idempotent writes; index for chart reads).
+2. **Streak math** ✅ — `core/src/accountability.ts`: same-week check-in is a no-op; previous week extends; any longer gap resets to 1. `isNudgeDue` decides nudges purely from state.
+3. **Rating tracking** ✅ — `RatingSource` port + adapters: `LichessRatingSource` (public `/api/user/{u}/rating-history`, day-granular; **field is `points`, not `values` — verified against the live API**; blitz/rapid/classical only) and `ChessComRatingSource` (public `/pub/player/{u}/stats` — no history endpoint exists, so the "equivalent" is the current rating per perf; the chart grows from check-in snapshots). `MockRatingSource` for dev/e2e (`GAME_SOURCE=mock` forces it, same rule as game sources). `snapshotRatings` (web lib) backfills ≤365 days on first sight, then appends only newer points; per-source failures are best-effort and never fail the check-in.
+4. **Check-in flow** ✅ — `POST /api/checkin` (rate-limited, session user): idempotent per week via upsert; streak advances only on the first check-in of the week; `checkin_done` + `streak_extended` (when it grew) analytics. UI: `/progress` page (streak card + check-in button + zero-dep SVG rating chart of the largest snapshot series, other series listed as current values); dashboard card shows check-in CTA / streak state.
+5. **Weekly nudge email** ✅ — worker `pipeline/nudge.ts` rides the poll loop (scanned at most once per `NUDGE_SCAN_INTERVAL_MS`, default hourly): users with ≥1 report, joined before this week, no check-in this week, not already nudged this week (≤ `NUDGE_MAX_PER_SCAN` per scan). Send failure = not marked nudged (retried next scan). Env: `NUDGE_ENABLED`/`NUDGE_SCAN_INTERVAL_MS`/`NUDGE_MAX_PER_SCAN`.
+
+**Verification done:** 25 new tests (streak math, Lichess/Chess.com parsing incl. untracked-perf drops + 404/backoff, nudge selection/idempotency/cap/failure-retry); 309 tests + lint + typecheck + web build green; migration deployed to Supabase; live smoke (`apps/worker/scripts/accountabilitySmoke.ts`, self-cleaning) against real Lichess/Chess.com APIs + the real DB: 30-point Lichess backfill + Chess.com snapshot, re-snapshot idempotent, streak 1 → same-week no-op, check-in unique constraint enforced, nudge candidate query selects pre-check-in and excludes post-check-in.
+
+> **Operational note:** the nudge scan is global by design — never run `sendWeeklyNudges` against the shared dev/prod DB manually (an early smoke did and marked 15 real users as nudged; reverted via SQL before any real email could go out — the smoke now checks candidacy without sending).
 
 ## 2.5 — Payments stubs/hooks only *(port shipped in 2.0; gateway deferred)*
 

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { weekStartFor } from '@chess-coach/core';
 import { prisma } from '@/lib/server';
 import { getSessionUserId } from '@/lib/auth';
 import { LoginForm } from '@/components/LoginForm';
@@ -49,6 +50,8 @@ export default async function DashboardPage() {
   const dueCount = await prisma.drill.count({
     where: { userId, dueAt: { lte: new Date() } },
   });
+  const streak = await prisma.streak.findUnique({ where: { userId } });
+  const checkedInThisWeek = streak?.lastCheckInWeekStart?.getTime() === weekStartFor(new Date()).getTime();
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
@@ -83,6 +86,25 @@ export default async function DashboardPage() {
           <span className="text-brand">Open →</span>
         </Link>
       )}
+
+      <Link
+        href="/progress"
+        className="mt-4 flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-4 hover:border-brand"
+      >
+        <span>
+          <span className="block font-semibold">
+            {checkedInThisWeek
+              ? `✓ Checked in — ${streak?.currentStreak ?? 0} week${(streak?.currentStreak ?? 0) === 1 ? '' : 's'} streak`
+              : 'Weekly check-in'}
+          </span>
+          <span className="text-sm text-neutral-500">
+            {checkedInThisWeek
+              ? 'See your rating trend and progress'
+              : 'Mark the week done and track your rating'}
+          </span>
+        </span>
+        <span className="text-brand">{checkedInThisWeek ? 'Progress →' : 'Check in →'}</span>
+      </Link>
 
       {dueCount > 0 && (
         <Link

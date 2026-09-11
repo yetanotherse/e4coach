@@ -19,7 +19,9 @@ export type AnalyticsEvent =
   // Phase 2 coaching events (plans/phase-2.md)
   | 'drill_attempted'
   | 'drill_solved'
-  | 'review_completed';
+  | 'review_completed'
+  | 'checkin_done'
+  | 'streak_extended';
 
 export interface Analytics {
   readonly name: string;

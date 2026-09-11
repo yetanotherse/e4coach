@@ -20,3 +20,6 @@ export * from './prompts/plan.js';
 
 // Weekly training plans (plans/phase-2.md 2.2a)
 export * from './plan/index.js';
+
+// Accountability loop: streaks + check-ins (plans/phase-2.md 2.4)
+export * from './accountability.js';

@@ -28,9 +28,12 @@ model User {
   reports      Report[]
   interests    Interest[]
   authChallenges AuthChallenge[]
-  drills       Drill[]
-  trainingPlans TrainingPlan[]
-  drillAttempts DrillAttempt[]
+  drills         Drill[]
+  trainingPlans  TrainingPlan[]
+  drillAttempts  DrillAttempt[]
+  streak         Streak?
+  checkIns       CheckIn[]
+  ratingSnapshots RatingSnapshot[]
 }
 
 model AnalysisJob {
@@ -250,4 +253,49 @@ model EvalCache {
   createdAt DateTime @default(now())
 
   @@id([fen, depth, kind])
+}
+
+// ── Accountability loop (plans/phase-2.md 2.4) ───────────────────────────────
+
+// One row per user: the weekly check-in streak. Weeks are Monday 00:00 UTC
+// (same weekStartFor math as training plans). lastNudgeWeekStart makes the
+// worker's weekly nudge email idempotent — at most one per user per week.
+model Streak {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak        Int       @default(0) // consecutive weeks with a check-in
+  longestStreak        Int       @default(0)
+  lastCheckInWeekStart DateTime? // weekStart of the most recent check-in
+  lastNudgeWeekStart   DateTime? // week the user was last nudged about
+  updatedAt            DateTime  @updatedAt
+}
+
+// One check-in per user per week (unique) — the act of showing up and marking
+// the week done. Rating snapshots are taken at check-in time.
+model CheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime // Monday 00:00 UTC of the checked-in week
+  createdAt DateTime @default(now())
+
+  @@unique([userId, weekStart])
+}
+
+// A rating datapoint for the progress chart. Snapshots are taken at check-in
+// (and backfilled once from Lichess's rating history on first snapshot).
+// (userId, source, perf, ratedAt) unique makes writes idempotent.
+model RatingSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source    String // 'lichess' | 'chesscom'
+  perf      String // 'blitz' | 'rapid' | 'classical'
+  rating    Int
+  ratedAt   DateTime // when the platform recorded this rating
+  createdAt DateTime @default(now())
+
+  @@unique([userId, source, perf, ratedAt])
+  @@index([userId, source, perf])
 }
