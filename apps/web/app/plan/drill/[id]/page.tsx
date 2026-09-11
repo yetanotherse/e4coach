@@ -27,6 +27,7 @@ export default async function DrillPage({ params }: { params: { id: string } }) 
   const meta = CATEGORY_META[row.theme as keyof typeof CATEGORY_META];
   const drill: DrillData = {
     id: row.id,
+    type: row.type === 'puzzle' ? 'puzzle' : 'own_game',
     theme: row.theme,
     themeName: meta?.displayName ?? row.theme,
     fen: row.fen,

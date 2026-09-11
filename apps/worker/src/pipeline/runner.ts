@@ -22,6 +22,7 @@ import {
 } from '@chess-coach/core';
 import { prisma, Prisma, type PrismaClient } from '@chess-coach/db';
 import { evaluateGame } from './evaluate.js';
+import type { EvalCachePort } from './evalCache.js';
 import { deepenProfile, type DeepenOptions } from './deepen.js';
 import { narrateExplanations } from './explain.js';
 import { generateReport } from './generate.js';
@@ -47,6 +48,8 @@ export interface RunDeps {
   /** fixed search depth — deterministic analysis (preferred over movetime) */
   depth: number;
   movetimeMs: number;
+  /** cross-job eval cache (plans/phase-2.md 2.2b); optional */
+  evalCache?: EvalCachePort;
   /** deep explanation pass; omitted or disabled leaves examples with `note` only */
   deepen?: DeepenOptions & { enabled: boolean };
 }
@@ -348,6 +351,7 @@ async function analyzeGames(
       const started = Date.now();
       const { lookup, evalCount: n } = await evaluateGame(game, parsed, deps.engine, {
         depth: deps.depth,
+        ...(deps.evalCache ? { evalCache: deps.evalCache } : {}),
       });
       evalCount += n;
       const moves = scoreUserMoves(parsed, lookup);

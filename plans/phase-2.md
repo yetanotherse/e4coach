@@ -53,13 +53,24 @@
 > Rationale: 2.2a delivers the full coach loop (profile → plan → drill → solve) on data we already have; 2.2b adds the external content slice without blocking the core loop.
 
 ### 2.2a — DONE (2026-09)
-
 1. **Schema** ✅ — migration `0000000000006_training_plans`: `TrainingPlan` (one active per user+weekStart; re-analysis supersedes), `PlanItem` (theme + goal), `Drill` (**user-owned**, m-n linked to plan items, deduped by userId+theme+fen+solutionUci so drills survive re-analysis and can recur weekly — SRS-ready), `DrillAttempt`.
 2. **Core plan module** ✅ — `buildPlanDraft(profile)`: top themes by impact (≤2), drills from real report examples (≤5/theme), Monday-UTC weekStart, template goals from `CATEGORY_META`; `prompts/plan.ts` LLM goal phrasing with the report prompt's grounding contract (unknown themes rejected; any failure → template goals).
 3. **Worker** ✅ — `pipeline/plan.ts` runs after report persist; failure logged, never fails the job.
 4. **Web** ✅ — `/plan` (focus themes, goals, drill list with ✓ solved state, "Continue training" → first unsolved drill); `/plan/drill/[id]` solve flow (user-owned check, interactive Chessground with legal-move dests, wrong-try snap-back + attempt recorded, hint after 3 tries or on demand, grounded note + "you had played X" on solve); `POST /api/drills/[id]/attempt` (session-owner enforced, Zod-validated); dashboard "This week's plan" card; `drill_attempted`/`drill_solved` analytics events.
 
 **Verification done:** unit tests (weekStart math, theme focus/caps, drill facts copied verbatim, skip-empty themes, goal counts); 254 tests + lint + typecheck + web build green; live full-stack smoke (mock adapters): signup → job → report → plan auto-created with 7 deduped drills across 2 themes, correctly linked.
+
+### 2.2b — DONE (2026-09)
+
+1. **Theme mapping** ✅ — `core/src/plan/puzzleThemes.ts`: Lichess puzzle theme tags → our 8-category taxonomy (TIME_TROUBLE intentionally absent — it's play skill, not solvable from a puzzle); conservative one-category-per-tag mapping.
+2. **Ingestion** ✅ — `apps/worker/scripts/ingestPuzzles.ts`: streams `curl | zstd -dc` (or a local CSV), filters by mapped theme + rating band (800–1600) + popularity, upserts into `Puzzle`. **Ran live: 3,278 puzzles** across 7 categories (500 each, WEAK_DEFENSE 278 — the defensive-move tag pool is thinner). Refreshable anytime; defaults documented in the script header.
+3. **Plan mixing** ✅ — `buildPlanDraft` accepts `puzzlesByTheme`/`puzzlesPerTheme` (default 2); puzzle drills append after own-game drills; a theme with no report examples but puzzle candidates is kept (pure-puzzle weeks); SAN derived via chess.js when missing; worker fetches candidates per focus theme from the Puzzle table (random-offset slice, best-effort). Drill dedupe now prefers `puzzleId`.
+4. **Eval cache** ✅ — `EvalCache` table (PK fen+depth+kind, migration `0000000000007_puzzles_and_eval_cache`) + `createDbEvalCache` in the worker; `evaluateGame` consults it and writes back — **only at fixed depth** (movetime evals are non-deterministic and never cached).
+5. **UI** ✅ — puzzle drills flagged in the solver; CC BY-SA attribution line for Lichess puzzle positions.
+
+**Verification done:** 265 tests green (puzzle mixing, SAN derivation, side-to-move from FEN, eval-cache hit/write/skip-at-movetime); live: 3,278 puzzles ingested; direct plan-generation smoke against the real DB produced own-game + puzzle drills (SANs computed) including a puzzle-only theme.
+
+> **Operational note discovered during smoke:** a real-env worker (the deployed Render worker) shares this Supabase DB with dev and will claim `PENDING` jobs from local dev signups within seconds — dev smokes should either run direct function calls (as done here) or use a separate dev database.
 
 1. **Schema:** `TrainingPlan` (userId, weekStart, sourceReportId, status), `PlanItem` (theme/taxonomy id, goal prose, drill refs), `Drill` (userId, type `own_game | puzzle`, sourceGameId/puzzleId, fen, solution line, taxonomy theme), `DrillAttempt` (drillId, solved, moveAccuracy, timeSpent).
 2. **Plan generator** (`packages/core`): WeaknessProfile → weekly plan (top 2 themes × 4–6 drills each); LLM (existing `LlmProvider` port, JSON-schema, grounding contract) writes goals/motivation only; deterministic assembly + template fallback.

@@ -36,6 +36,10 @@ function fakeDb(gameRows: Array<Record<string, unknown>> = []) {
     game: {
       findMany: async () => gameRows,
     },
+    // Plan generation's puzzle fetch is best-effort; give it a quiet empty table.
+    puzzle: {
+      count: async () => 0,
+    },
   } as unknown as PrismaClient;
   return { db, state };
 }
