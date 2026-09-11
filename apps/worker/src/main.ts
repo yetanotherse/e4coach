@@ -29,6 +29,13 @@ async function main(): Promise<void> {
   const env = loadEnv();
   const controller = new AbortController();
 
+  // Sentry (plans/phase-2.md 2.0.6) — init early so global handlers cover the
+  // whole process; no-op without a DSN.
+  if (env.SENTRY_DSN) {
+    const Sentry = await import('@sentry/node');
+    Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV, tracesSampleRate: 0 });
+  }
+
   const deps = {
     gameSource: createGameSource(env),
     engine: createEngine(env),
@@ -120,6 +127,10 @@ async function main(): Promise<void> {
   });
   await deps.engine.dispose();
   await deps.analytics.flush();
+  if (env.SENTRY_DSN) {
+    const Sentry = await import('@sentry/node');
+    await Sentry.flush(2000).catch(() => undefined);
+  }
   console.log('[worker] stopped');
 }
 

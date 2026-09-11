@@ -16,17 +16,18 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  emailHash    String?       // hashed email for analytics distinctId (spec §15)
+  id           String         @id @default(cuid())
+  email        String         @unique
+  emailHash    String?        // hashed email for analytics distinctId (spec §15)
   lichessUser  String?
   chessComUser String?
   consentAt    DateTime? // when the user accepted the privacy policy
-  createdAt    DateTime      @default(now())
-  lastSeenAt   DateTime      @default(now())
+  createdAt    DateTime       @default(now())
+  lastSeenAt   DateTime       @default(now())
   analysisJobs AnalysisJob[]
   reports      Report[]
   interests    Interest[]
+  authChallenges AuthChallenge[]
 }
 
 model AnalysisJob {
@@ -108,4 +109,30 @@ enum JobStatus {
   GENERATING
   DONE
   FAILED
+}
+
+// Passwordless sign-in challenges (plans/phase-2.md 2.0). Only OTP for now;
+// magic links stay stateless HMAC tokens in apps/web/lib/token.ts. The code is
+// never stored in plaintext — only an HMAC of it, so a DB leak can't sign in.
+model AuthChallenge {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String // 'otp'
+  codeHash   String // HMAC-SHA256(secret, email + code) hex
+  attempts   Int       @default(0) // verify attempts; exhausted => challenge dead
+  expiresAt  DateTime
+  consumedAt DateTime? // set when verified; a used challenge can't replay
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, kind])
+}
+
+// DB-backed fixed-window rate limiting (plans/phase-2.md 2.0.5). One row per
+// bucket; the window rolls via an atomic upsert in lib/rateLimit.ts.
+model RateLimitBucket {
+  bucket      String   @id // e.g. "auth_request:1.2.3.4"
+  windowStart DateTime
+  count       Int      @default(0)
+  createdAt   DateTime @default(now())
 }

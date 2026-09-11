@@ -4,6 +4,8 @@ import { test, expect } from '@playwright/test';
  * Full funnel on mock adapters: landing → signup → analysis job → report →
  * fake-door interest click. Requires the web app + worker running against a
  * test Postgres with GAME_SOURCE/ENGINE_KIND/LLM_PROVIDER=mock.
+ * Set RATE_LIMIT_ENABLED=false in that stack's env — repeated runs share one
+ * IP bucket and would otherwise trip the signup limiter (plans/phase-2.md 2.0.5).
  */
 test('signup → report → interest', async ({ page }) => {
   const email = `e2e-${Date.now()}@example.com`;

@@ -13,7 +13,8 @@
     "@chess-coach/adapters": "workspace:*",
     "@chess-coach/config": "workspace:*",
     "@chess-coach/core": "workspace:*",
-    "@chess-coach/db": "workspace:*"
+    "@chess-coach/db": "workspace:*",
+    "@sentry/node": "^10.74.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

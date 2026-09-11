@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { analytics, jsonError, jsonOk } from '@/lib/server';
+import { analytics, jsonError, jsonOk, rateLimit } from '@/lib/server';
 import { getSessionUserId } from '@/lib/auth';
 import type { AnalyticsEvent } from '@chess-coach/core';
 
@@ -31,6 +31,8 @@ const TrackSchema = z.object({
  * id when signed in, otherwise a stable anonymous cookie for funnel continuity.
  */
 export async function POST(req: Request): Promise<Response> {
+  if (!(await rateLimit(req, 'track'))) return jsonError('Too many requests.', 429);
+
   let body: unknown;
   try {
     body = await req.json();

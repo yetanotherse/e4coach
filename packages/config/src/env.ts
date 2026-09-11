@@ -84,6 +84,17 @@ const EnvSchema = z.object({
   EMAIL_FROM: z.string().default('Chess Coach <noreply@example.com>'),
   SENTRY_DSN: z.string().optional(),
 
+  // Billing (plans/phase-2.md 2.5 / D-P2-2). Gateway DEFERRED — the port exists,
+  // only the mock adapter is real. Future values: e.g. 'stripe', 'paddle'.
+  BILLING_PROVIDER: z.enum(['mock']).default('mock'),
+
+  // Rate limiting (plans/phase-2.md 2.0.5) — DB-backed fixed windows per IP.
+  // Fixed 60s windows; values are requests per minute per bucket.
+  RATE_LIMIT_ENABLED: boolish.default('true'),
+  RATE_LIMIT_AUTH_PER_MIN: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_SIGNUP_PER_MIN: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_TRACK_PER_MIN: z.coerce.number().int().positive().default(600),
+
   // Worker
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   // Stale-job recovery: a job claimed but left in an in-progress state with no

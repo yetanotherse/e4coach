@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { env, jsonError, jsonOk, mailer, prisma } from '@/lib/server';
+import { env, jsonError, jsonOk, mailer, prisma, rateLimit } from '@/lib/server';
 import { createMagicToken } from '@/lib/auth';
+import { sendMagicLinkEmail } from '@/lib/signinEmail';
 
 const RequestSchema = z.object({ email: z.string().trim().email().max(254) });
 
@@ -9,6 +10,10 @@ const RequestSchema = z.object({ email: z.string().trim().email().max(254) });
  * ok regardless of whether the email exists, to avoid leaking account presence.
  */
 export async function POST(req: Request): Promise<Response> {
+  if (!(await rateLimit(req, 'auth'))) {
+    return jsonError('Too many requests. Please try again in a minute.', 429);
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -23,14 +28,7 @@ export async function POST(req: Request): Promise<Response> {
     const token = createMagicToken(user.id);
     const link = `${env.APP_URL}/api/auth/callback?token=${encodeURIComponent(token)}`;
     try {
-      await mailer.send({
-        to: user.email,
-        subject: 'Your e4coach sign-in link',
-        html: `<p>Click to sign in and see your reports:</p>
-               <p><a href="${link}">Sign in to e4coach</a></p>
-               <p style="color:#666;font-size:13px">This link expires in 15 minutes.</p>`,
-        text: `Sign in to e4coach: ${link}`,
-      });
+      await sendMagicLinkEmail(mailer, user.email, link);
     } catch {
       /* don't reveal delivery failures to the caller */
     }

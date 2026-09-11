@@ -1,14 +1,21 @@
 import { dbFingerprint } from '@chess-coach/config';
 import { SignupSchema } from '@/lib/validation';
-import { analytics, env, jsonError, jsonOk, prisma } from '@/lib/server';
+import { analytics, env, jsonError, jsonOk, mailer, prisma, rateLimit } from '@/lib/server';
 import { hashEmail } from '@/lib/hash';
+import { createMagicToken } from '@/lib/auth';
+import { sendMagicLinkEmail } from '@/lib/signinEmail';
 
 /**
  * POST /api/signup — create/lookup the user, record consent, and enqueue an
  * AnalysisJob the worker will pick up (spec §13). Returns the job id so the
- * client can poll the progress screen.
+ * client can poll the progress screen. Also emails a magic sign-in link so the
+ * user gets a real session without a separate login step (plans/phase-2.md 2.0.1).
  */
 export async function POST(req: Request): Promise<Response> {
+  if (!(await rateLimit(req, 'signup'))) {
+    return jsonError('Too many requests. Please try again in a minute.', 429);
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -58,6 +65,21 @@ export async function POST(req: Request): Promise<Response> {
 
   await analytics.capture(emailHash, 'signup_completed', { source });
   if (!active) await analytics.capture(emailHash, 'job_started', { jobId: job.id, source });
+
+  // Sign-in email, fire-and-forget: analysis continues even if Resend hiccups,
+  // and delivery failures must not block the 201 the client is polling on.
+  try {
+    const token = createMagicToken(user.id);
+    const link = `${env.APP_URL}/api/auth/callback?token=${encodeURIComponent(token)}`;
+    await sendMagicLinkEmail(
+      mailer,
+      user.email,
+      link,
+      'Your e4coach sign-in link (report is being analyzed)',
+    );
+  } catch (err) {
+    console.warn('[signup] sign-in email failed:', err);
+  }
 
   return jsonOk({ jobId: job.id, userId: user.id }, 201);
 }
