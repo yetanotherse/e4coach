@@ -143,6 +143,12 @@ NODE_ENV=production
 ENGINE_POOL_SIZE=4
 ENGINE_THREADS=1
 ENGINE_HASH=256
+
+# --- Prisma connection pool (optional) ---
+# Prisma defaults: connection_limit = cores*2+1 (min 2), pool_timeout = 10s.
+# The worker batches eval-cache reads/writes so a full job stays within the
+# defaults. If you ever raise burst DB concurrency elsewhere, append e.g.
+# ?connection_limit=20&pool_timeout=30 to DATABASE_URL.
 EOF
 chmod 600 /opt/e4coach/worker.env   # owner-only; you own it, so docker can still read it
 
