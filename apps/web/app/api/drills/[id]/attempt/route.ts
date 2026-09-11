@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { dueAtFor, isDue, nextSrsState } from '@chess-coach/core';
-import { analytics, jsonError, jsonOk, prisma } from '@/lib/server';
+import { analytics, jsonError, jsonOk, prisma, ratingChessCom, ratingLichess } from '@/lib/server';
 import { getSessionUserId } from '@/lib/auth';
+import { recordCheckIn } from '@/lib/checkin';
+import { snapshotRatings } from '@/lib/ratingSnapshots';
 
 const AttemptSchema = z.object({
   solved: z.boolean(),
@@ -63,7 +65,7 @@ export async function POST(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { emailHash: true },
+    select: { emailHash: true, lichessUser: true, chessComUser: true },
   });
   const distinctId = user?.emailHash ?? userId;
   await analytics.capture(distinctId, solved ? 'drill_solved' : 'drill_attempted', {
@@ -74,6 +76,17 @@ export async function POST(
   });
 
   if (solved) {
+    // First solve of the week checks the user in automatically — the manual
+    // button and drill solves share one idempotent path (lib/checkin), so the
+    // streak advances exactly once per week.
+    const checkIn = await recordCheckIn(userId, distinctId, new Date(), 'drill');
+    if (checkIn.created) {
+      void snapshotRatings(prisma, userId, [
+        { source: 'lichess', username: user?.lichessUser ?? null, provider: ratingLichess },
+        { source: 'chesscom', username: user?.chessComUser ?? null, provider: ratingChessCom },
+      ]);
+    }
+
     const wasDue = isDue(drill.dueAt, new Date());
     const lapses = await prisma.drillAttempt.count({
       where: {
