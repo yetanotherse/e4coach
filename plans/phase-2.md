@@ -116,3 +116,4 @@
 - Zod at every boundary; TypeScript strict; tests alongside code; conventional commits.
 - Rate-limit, backoff, and graceful-degradation every external call.
 - Analytics events added per sub-phase (plan_generated, drill_solved, review_completed, checkin_done, streak_extended…).
+- **RLS on every new table** (2026-09): each migration creating tables must `ENABLE ROW LEVEL SECURITY` on them — deny-all, no policies (the app's `postgres` owner role bypasses RLS; PostgREST anon/authenticated get nothing; see migrations 0004/0010). Guard: `pnpm --filter worker exec tsx scripts/checkRls.ts` asserts every public table has RLS — run after deploys / in CI.
