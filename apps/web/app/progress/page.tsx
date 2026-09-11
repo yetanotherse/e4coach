@@ -24,10 +24,11 @@ export default async function ProgressPage() {
     );
   }
 
-  const [streak, snapshots, dueDrills] = await Promise.all([
+  const [streak, snapshots, dueDrills, user] = await Promise.all([
     prisma.streak.findUnique({ where: { userId } }),
     prisma.ratingSnapshot.findMany({ where: { userId }, orderBy: { ratedAt: 'asc' } }),
     prisma.drill.count({ where: { userId, dueAt: { lte: new Date() } } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { lichessUser: true, chessComUser: true } }),
   ]);
 
   const weekStart = weekStartFor(new Date());
@@ -72,7 +73,9 @@ export default async function ProgressPage() {
           </div>
         ) : (
           <p className="mt-2 text-sm text-neutral-500">
-            No rating snapshots yet — add your Lichess or Chess.com username and check in to start the chart.
+            {user?.lichessUser || user?.chessComUser
+              ? 'No rating snapshots yet — the chart fills in when you check in (or solve your first drill of the week).'
+              : 'No rating snapshots yet — add your Lichess or Chess.com username and check in to start the chart.'}
           </p>
         )}
         {seriesList.length > 1 && (

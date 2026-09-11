@@ -1,9 +1,20 @@
 import { dbFingerprint } from '@chess-coach/config';
 import { SignupSchema } from '@/lib/validation';
-import { analytics, env, jsonError, jsonOk, mailer, prisma, rateLimit } from '@/lib/server';
+import {
+  analytics,
+  env,
+  jsonError,
+  jsonOk,
+  mailer,
+  prisma,
+  rateLimit,
+  ratingChessCom,
+  ratingLichess,
+} from '@/lib/server';
 import { hashEmail } from '@/lib/hash';
 import { createMagicToken } from '@/lib/auth';
 import { sendMagicLinkEmail } from '@/lib/signinEmail';
+import { snapshotRatings } from '@/lib/ratingSnapshots';
 
 /**
  * POST /api/signup — create/lookup the user, record consent, and enqueue an
@@ -54,6 +65,14 @@ export async function POST(req: Request): Promise<Response> {
       lastSeenAt: new Date(),
     },
   });
+
+  // First rating snapshot as soon as a username exists: snapshots used to wait
+  // for the next check-in, which could be a week away. Fire-and-forget — the
+  // snapshot is best-effort by design and must not delay the job response.
+  void snapshotRatings(prisma, user.id, [
+    { source: 'lichess', username: user.lichessUser, provider: ratingLichess },
+    { source: 'chesscom', username: user.chessComUser, provider: ratingChessCom },
+  ]).catch(() => undefined);
 
   // Avoid piling up duplicate jobs if the user resubmits while one is running.
   const active = await prisma.analysisJob.findFirst({
