@@ -1,5 +1,5 @@
 import { InterestSchema } from '@/lib/validation';
-import { analytics, jsonError, jsonOk, prisma } from '@/lib/server';
+import { analytics, jsonError, jsonOk, prisma, rateLimit } from '@/lib/server';
 import { hashEmail } from '@/lib/hash';
 
 /**
@@ -7,6 +7,10 @@ import { hashEmail } from '@/lib/hash';
  * in the DB and PostHog. Anonymous-friendly: userId is optional.
  */
 export async function POST(req: Request): Promise<Response> {
+  if (!(await rateLimit(req, 'track'))) {
+    return jsonError('Too many requests. Please try again in a minute.', 429);
+  }
+
   let body: unknown;
   try {
     body = await req.json();

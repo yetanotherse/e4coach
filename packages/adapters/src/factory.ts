@@ -6,14 +6,19 @@
  * breaks.
  */
 import type { Env } from '@chess-coach/config';
-import type { Analytics, ChessEngine, GameSource, LlmProvider, Mailer } from '@chess-coach/core';
+import type { Analytics, Billing, ChessEngine, GameSource, LlmProvider, Mailer, RatingSource } from '@chess-coach/core';
 
 import { MockGameSource } from './mocks/mockGameSource.js';
 import { MockEngine } from './mocks/mockEngine.js';
 import { MockLlmProvider } from './mocks/mockLlm.js';
 import { MockAnalytics } from './mocks/mockAnalytics.js';
 import { MockMailer } from './mocks/mockMailer.js';
+import { MockBilling } from './billing/mockBilling.js';
+import { MockRatingSource } from './mocks/mockRatingSource.js';
 import { LichessGameSource } from './lichess/lichessGameSource.js';
+import { ChessComGameSource } from './chesscom/chessComGameSource.js';
+import { LichessRatingSource } from './rating/lichessRatingSource.js';
+import { ChessComRatingSource } from './rating/chessComRatingSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
 import type { ResilienceOptions } from './llm/resilience.js';
@@ -26,6 +31,39 @@ export function createGameSource(env: Env): GameSource {
       return new MockGameSource();
     case 'lichess':
       return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
+    case 'chesscom':
+      return new ChessComGameSource({ userAgent: env.CHESSCOM_USER_AGENT });
+  }
+}
+
+/**
+ * Per-job live game source selection (plans/phase-2.md 2.1): users pick their
+ * platform at signup, so the worker needs whichever source that job names.
+ * When GAME_SOURCE=mock (dev/e2e), every request stays on the mock regardless
+ * of the platform chosen.
+ */
+export function createGameSourceFor(env: Env, source: 'lichess' | 'chesscom'): GameSource {
+  if (env.GAME_SOURCE === 'mock') return new MockGameSource();
+  switch (source) {
+    case 'lichess':
+      return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
+    case 'chesscom':
+      return new ChessComGameSource({ userAgent: env.CHESSCOM_USER_AGENT });
+  }
+}
+
+/**
+ * Rating source selection (plans/phase-2.md 2.4). Same mock rule as game
+ * sources: when GAME_SOURCE=mock (dev/e2e), every platform stays on the mock
+ * so no dev run touches the real rating APIs.
+ */
+export function createRatingSourceFor(env: Env, source: 'lichess' | 'chesscom'): RatingSource {
+  if (env.GAME_SOURCE === 'mock') return new MockRatingSource();
+  switch (source) {
+    case 'lichess':
+      return new LichessRatingSource({ userAgent: env.LICHESS_USER_AGENT });
+    case 'chesscom':
+      return new ChessComRatingSource({ userAgent: env.CHESSCOM_USER_AGENT });
   }
 }
 
@@ -82,5 +120,14 @@ export function createMailer(env: Env): Mailer {
     case 'resend':
       if (!env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is required for resend mailer');
       return new ResendMailer({ apiKey: env.RESEND_API_KEY, from: env.EMAIL_FROM });
+  }
+}
+
+// Billing (plans/phase-2.md 2.5 / D-P2-2): gateway deferred. Only the mock
+// exists; future gateway adapters (stripe/paddle/…) slot in here by env.
+export function createBilling(env: Env): Billing {
+  switch (env.BILLING_PROVIDER) {
+    case 'mock':
+      return new MockBilling();
   }
 }

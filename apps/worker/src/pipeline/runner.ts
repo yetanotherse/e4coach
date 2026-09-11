@@ -22,15 +22,19 @@ import {
 } from '@chess-coach/core';
 import { prisma, Prisma, type PrismaClient } from '@chess-coach/db';
 import { evaluateGame } from './evaluate.js';
+import type { EvalCachePort } from './evalCache.js';
 import { deepenProfile, type DeepenOptions } from './deepen.js';
 import { narrateExplanations } from './explain.js';
 import { generateReport } from './generate.js';
+import { generateTrainingPlan } from './plan.js';
 import { generateSlug } from './slug.js';
 import { sendReportReadyEmail } from './notify.js';
 
 export interface RunDeps {
   db?: PrismaClient;
   gameSource: GameSource;
+  /** chess.com live source (plans/phase-2.md 2.1); used when job.source === 'chesscom' */
+  chessComSource?: GameSource;
   engine: ChessEngine;
   llm: LlmProvider;
   analytics: Analytics;
@@ -44,6 +48,8 @@ export interface RunDeps {
   /** fixed search depth — deterministic analysis (preferred over movetime) */
   depth: number;
   movetimeMs: number;
+  /** cross-job eval cache (plans/phase-2.md 2.2b); optional */
+  evalCache?: EvalCachePort;
   /** deep explanation pass; omitted or disabled leaves examples with `note` only */
   deepen?: DeepenOptions & { enabled: boolean };
 }
@@ -83,6 +89,7 @@ export interface UserRecord {
   email: string;
   emailHash: string | null;
   lichessUser: string | null;
+  chessComUser: string | null;
 }
 
 /** Run a single job end-to-end. Returns the created report's public slug. */
@@ -95,16 +102,25 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
   };
 
   const stored = isStoredSource(job.source);
-  // Live sources need a Lichess account to fetch from; stored sources (studies,
-  // PGN uploads) already have their games in the DB and may have no username.
-  // PGN uploads aren't tied to any account — the user could have a stale
-  // lichessUser on their row from an earlier flow — so always address them as
-  // "you" rather than leaking an unrelated username.
+  const isChessCom = job.source === 'chesscom';
+  // Live sources need an account on their platform to fetch from; stored
+  // sources (studies, PGN uploads) already have their games in the DB and may
+  // have no username. PGN uploads aren't tied to any account — the user could
+  // have a stale lichessUser on their row from an earlier flow — so always
+  // address them as "you" rather than leaking an unrelated username.
   const displayName =
     job.source === 'pgn' ? 'you' : (user.lichessUser ?? user.email.split('@')[0] ?? 'You');
 
   try {
-    if (!stored && !user.lichessUser) throw new Error('user has no lichess username');
+    if (!stored) {
+      const username = isChessCom ? user.chessComUser : user.lichessUser;
+      if (!username) {
+        throw new Error(isChessCom ? 'user has no chess.com username' : 'user has no lichess username');
+      }
+      if (isChessCom && !deps.chessComSource) {
+        throw new Error('chess.com game source not configured on this worker');
+      }
+    }
 
     // ── Stage 1: obtain games ───────────────────────────────────────
     // Pre-stored sources (studies, PGN uploads) load from the DB; live sources fetch.
@@ -124,7 +140,9 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       console.log(
         `[runner] job ${job.id} live fetch: up to ${requestedMax} (selected ${job.params?.maxGames ?? 'default'}, cap ${deps.maxGames})`,
       );
-      games = await deps.gameSource.fetchRecentGames(user.lichessUser!, {
+      const liveSource = isChessCom ? deps.chessComSource : deps.gameSource;
+      const username = isChessCom ? user.chessComUser : user.lichessUser;
+      games = await liveSource!.fetchRecentGames(username!, {
         max: requestedMax,
         rated: true,
         perfTypes,
@@ -181,7 +199,7 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
 
     // ── Stage 6: persist ────────────────────────────────────────────
     const slug = generateSlug();
-    await db.report.create({
+    const report = await db.report.create({
       data: {
         userId: user.id,
         jobId: job.id,
@@ -211,6 +229,22 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       movesScored,
       skipped,
     });
+
+    // ── Stage 7: this week's training plan (optional upgrade) ──────
+    // Built from the same profile; failure here must not fail the job (the
+    // report is already persisted). The plan page reads it via the report.
+    try {
+      await generateTrainingPlan(
+        db,
+        { userId: user.id, profile, reportId: report.id },
+        deps.llm,
+      );
+    } catch (err) {
+      console.warn(
+        `[runner] job ${job.id} plan generation failed (report unaffected):`,
+        err instanceof Error ? err.message : err,
+      );
+    }
 
     // Notify the user their report is ready. Email failure must not fail the job.
     try {
@@ -317,6 +351,7 @@ async function analyzeGames(
       const started = Date.now();
       const { lookup, evalCount: n } = await evaluateGame(game, parsed, deps.engine, {
         depth: deps.depth,
+        ...(deps.evalCache ? { evalCache: deps.evalCache } : {}),
       });
       evalCount += n;
       const moves = scoreUserMoves(parsed, lookup);

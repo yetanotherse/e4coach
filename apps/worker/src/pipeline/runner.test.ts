@@ -36,6 +36,10 @@ function fakeDb(gameRows: Array<Record<string, unknown>> = []) {
     game: {
       findMany: async () => gameRows,
     },
+    // Plan generation's puzzle fetch is best-effort; give it a quiet empty table.
+    puzzle: {
+      count: async () => 0,
+    },
   } as unknown as PrismaClient;
   return { db, state };
 }
@@ -58,7 +62,13 @@ function makeDeps(db: PrismaClient, over: Partial<RunDeps> = {}): RunDeps {
   };
 }
 
-const user = { id: 'u1', email: 'u1@example.com', emailHash: 'hash1', lichessUser: 'mockuser' };
+const user = {
+  id: 'u1',
+  email: 'u1@example.com',
+  emailHash: 'hash1',
+  lichessUser: 'mockuser',
+  chessComUser: null,
+};
 const job = { id: 'j1', userId: 'u1', source: 'mock' };
 
 describe('runJob (full pipeline on mocks)', () => {
@@ -157,5 +167,44 @@ describe('runJob (full pipeline on mocks)', () => {
     // The per-game time-control badge data is carried onto embedded games.
     const embedded = Object.values(content.games!);
     expect(embedded.some((g) => g.speed === 'rapid')).toBe(true);
+  });
+
+  it('chesscom source fetches via chessComSource with the chess.com username', async () => {
+    const fetched: string[] = [];
+    const source = new MockGameSource(MOCK_GAMES);
+    const realFetch = source.fetchRecentGames.bind(source);
+    source.fetchRecentGames = (username, opts) => {
+      fetched.push(username);
+      return realFetch(username, opts);
+    };
+    const { db, state } = fakeDb();
+    const ccJob = { id: 'j4', userId: 'u1', source: 'chesscom' };
+    const slug = await runJob(
+      ccJob,
+      { ...user, lichessUser: null, chessComUser: 'ccuser' },
+      makeDeps(db, { chessComSource: source }),
+    );
+
+    expect(slug).toBeTruthy();
+    expect(fetched).toEqual(['ccuser']);
+    expect(state.jobUpdates.find((u) => u.status === 'DONE')).toBeDefined();
+  });
+
+  it('marks the job FAILED for chesscom without a chess.com username', async () => {
+    const { db, state } = fakeDb();
+    const ccJob = { id: 'j5', userId: 'u1', source: 'chesscom' };
+    await expect(
+      runJob(ccJob, { ...user, chessComUser: null }, makeDeps(db)),
+    ).rejects.toThrow('user has no chess.com username');
+    expect(state.jobUpdates[state.jobUpdates.length - 1]!.status).toBe('FAILED');
+  });
+
+  it('marks the job FAILED for chesscom when the source is not configured', async () => {
+    const { db, state } = fakeDb();
+    const ccJob = { id: 'j6', userId: 'u1', source: 'chesscom' };
+    await expect(
+      runJob(ccJob, { ...user, chessComUser: 'ccuser' }, makeDeps(db)),
+    ).rejects.toThrow('chess.com game source not configured');
+    expect(state.jobUpdates[state.jobUpdates.length - 1]!.status).toBe('FAILED');
   });
 });

@@ -8,12 +8,13 @@ import { loadEnv, dbFingerprint } from '@chess-coach/config';
 import {
   createAnalytics,
   createEngine,
-  createGameSource,
+  createGameSourceFor,
   createLlmProvider,
   createMailer,
 } from '@chess-coach/adapters';
 import { prisma } from '@chess-coach/db';
 import { runPollLoop } from './pipeline/poller.js';
+import { createDbEvalCache } from './pipeline/evalCache.js';
 
 /** Host (and db name) of a Postgres URL, with credentials stripped, for logs. */
 function dbTarget(url: string): string {
@@ -29,9 +30,20 @@ async function main(): Promise<void> {
   const env = loadEnv();
   const controller = new AbortController();
 
+  // Sentry (plans/phase-2.md 2.0.6) — init early so global handlers cover the
+  // whole process; no-op without a DSN.
+  if (env.SENTRY_DSN) {
+    const Sentry = await import('@sentry/node');
+    Sentry.init({ dsn: env.SENTRY_DSN, environment: env.NODE_ENV, tracesSampleRate: 0 });
+  }
+
+  const engine = createEngine(env);
   const deps = {
-    gameSource: createGameSource(env),
-    engine: createEngine(env),
+    gameSource: createGameSourceFor(env, 'lichess'),
+    chessComSource: createGameSourceFor(env, 'chesscom'),
+    engine,
+    // Cross-job eval cache: only meaningful with a fixed depth (deterministic).
+    evalCache: createDbEvalCache(prisma, { kind: engine.name, depth: env.ENGINE_DEPTH }),
     // Token telemetry: a job now makes ~8 LLM calls (one report + one per
     // explanation batch) instead of one, so unmetered usage is no longer fine.
     llm: createLlmProvider(env, {
@@ -58,6 +70,7 @@ async function main(): Promise<void> {
 
   console.log('[worker] started', {
     gameSource: deps.gameSource.name,
+    chessComSource: deps.chessComSource.name,
     engine: deps.engine.name,
     enginePool: env.ENGINE_POOL_SIZE,
     engineThreads: env.ENGINE_THREADS,
@@ -117,9 +130,22 @@ async function main(): Promise<void> {
     signal: controller.signal,
     staleJobMs: env.WORKER_STALE_JOB_MS,
     maxAttempts: env.WORKER_MAX_ATTEMPTS,
+    ...(env.NUDGE_ENABLED
+      ? {
+          nudge: {
+            deps: { db: prisma, mailer: deps.mailer, analytics: deps.analytics },
+            opts: { appUrl: env.APP_URL, maxPerScan: env.NUDGE_MAX_PER_SCAN },
+            scanIntervalMs: env.NUDGE_SCAN_INTERVAL_MS,
+          },
+        }
+      : {}),
   });
   await deps.engine.dispose();
   await deps.analytics.flush();
+  if (env.SENTRY_DSN) {
+    const Sentry = await import('@sentry/node');
+    await Sentry.flush(2000).catch(() => undefined);
+  }
   console.log('[worker] stopped');
 }
 

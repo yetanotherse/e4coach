@@ -454,6 +454,8 @@ Typed, Zod-validated in `packages/config`. Required env (names indicative):
 
 Listed here so the whole plan lives in one document. Gate each phase on the prior phase's validation.
 
+> **Build-ready plans live in `plans/`** (e.g. `plans/phase-2.md`). Each active phase gets its own plan file there with locked decisions, sub-phase breakdown, data-model changes, and verification criteria. This future-phases section stays as the high-level roadmap only.
+
 ## Phase 2 — The core coaching product [P2] *(only if MVP validates)*
 Turn the one-shot report into an ongoing product for the **adult improver beachhead (≈800–1600)**.
 - **Adaptive weekly training plan** generated from the weakness profile ("this week: back-rank awareness + this endgame").

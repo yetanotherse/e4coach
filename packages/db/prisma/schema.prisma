@@ -16,17 +16,24 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  emailHash    String?       // hashed email for analytics distinctId (spec §15)
+  id           String          @id @default(cuid())
+  email        String          @unique
+  emailHash    String?         // hashed email for analytics distinctId (spec §15)
   lichessUser  String?
   chessComUser String?
   consentAt    DateTime? // when the user accepted the privacy policy
-  createdAt    DateTime      @default(now())
-  lastSeenAt   DateTime      @default(now())
+  createdAt    DateTime        @default(now())
+  lastSeenAt   DateTime        @default(now())
   analysisJobs AnalysisJob[]
   reports      Report[]
   interests    Interest[]
+  authChallenges AuthChallenge[]
+  drills         Drill[]
+  trainingPlans  TrainingPlan[]
+  drillAttempts  DrillAttempt[]
+  streak         Streak?
+  checkIns       CheckIn[]
+  ratingSnapshots RatingSnapshot[]
 }
 
 model AnalysisJob {
@@ -73,17 +80,18 @@ model Game {
 }
 
 model Report {
-  id         String   @id @default(cuid())
+  id         String        @id @default(cuid())
   userId     String
-  jobId      String   @unique
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job        AnalysisJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  publicSlug String   @unique // long random unguessable token (spec §11.2)
+  jobId      String        @unique
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job        AnalysisJob   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  publicSlug String        @unique // long random unguessable token (spec §11.2)
   profile    Json // structured WeaknessProfile (source of truth)
   content    Json // rendered ReportContent (LLM prose + example refs)
-  degraded   Boolean  @default(false) // produced by template fallback?
-  createdAt  DateTime @default(now())
-  viewCount  Int      @default(0)
+  degraded   Boolean       @default(false) // produced by template fallback?
+  createdAt  DateTime      @default(now())
+  viewCount  Int           @default(0)
+  trainingPlans TrainingPlan[]
 
   @@index([userId])
 }
@@ -108,4 +116,186 @@ enum JobStatus {
   GENERATING
   DONE
   FAILED
+}
+
+// Passwordless sign-in challenges (plans/phase-2.md 2.0). Only OTP for now;
+// magic links stay stateless HMAC tokens in apps/web/lib/token.ts. The code is
+// never stored in plaintext — only an HMAC of it, so a DB leak can't sign in.
+model AuthChallenge {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String // 'otp'
+  codeHash   String // HMAC-SHA256(secret, email + code) hex
+  attempts   Int       @default(0) // verify attempts; exhausted => challenge dead
+  expiresAt  DateTime
+  consumedAt DateTime? // set when verified; a used challenge can't replay
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, kind])
+}
+
+// DB-backed fixed-window rate limiting (plans/phase-2.md 2.0.5). One row per
+// bucket; the window rolls via an atomic upsert in lib/rateLimit.ts.
+model RateLimitBucket {
+  bucket      String   @id // e.g. "auth_request:1.2.3.4"
+  windowStart DateTime
+  count       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// ── Training plans & drills (plans/phase-2.md 2.2a) ─────────────────────────
+// One plan per user per week, generated from a report's WeaknessProfile.
+// Re-analysis in the same week supersedes the earlier plan (status field),
+// while drills — owned by the user — survive via dedupe so 2.3's spaced
+// repetition can schedule them across weeks.
+
+model TrainingPlan {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceReportId String?
+  report         Report?  @relation(fields: [sourceReportId], references: [id], onDelete: SetNull)
+  weekStart      DateTime // Monday 00:00 UTC of this plan's week
+  // 'active' | 'superseded' - a new plan for the same week takes over.
+  status         String   @default("active")
+  createdAt      DateTime @default(now())
+  items          PlanItem[]
+
+  @@index([userId, weekStart])
+  @@index([userId, status])
+}
+
+// One focus theme within a plan, with its coach-voiced goal for the week.
+model PlanItem {
+  id     String       @id @default(cuid())
+  planId String
+  plan   TrainingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  theme  String // WeaknessCategory id
+  goal   String // this week's goal prose (template or LLM-phrased)
+  drills Drill[]
+
+  @@index([planId])
+}
+
+// A position to re-solve: from the user's own games (2.2a) or the puzzle DB
+// (2.2b). Owned directly by the user (NOT by a plan) so a drill can recur in
+// later weeks' plans and carry its own attempt/scheduling history.
+model Drill {
+  id            String         @id @default(cuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String         @default("own_game") // own_game | puzzle (2.2b)
+  theme         String // WeaknessCategory id
+  fen           String // position BEFORE the mistake — the user's move to find
+  sideToMove    String // 'white' | 'black' (== the user's color in the game)
+  solutionUci   String // engine's better move (UCI)
+  solutionSan   String?
+  playedMoveSan String? // what the user actually played (revealed feedback)
+  gameId        String? // source game id (ties to the report example)
+  puzzleId      String? // Lichess puzzle id (type = 'puzzle', plans/phase-2.md 2.2b)
+  note          String? // deterministic factual note from the report
+  // SM-2-lite scheduling state (plans/phase-2.md 2.3). Null lastReviewedAt =
+  // never reviewed (new drill); such drills are due immediately.
+  intervalDays   Int       @default(0) // days until next review after last solve
+  ease           Float     @default(2.5) // SM-2 easiness factor, clamped ≥ 1.3
+  dueAt          DateTime  @default(now()) // next review time; overdue = due
+  lastReviewedAt DateTime?
+  reviewCount    Int       @default(0) // successful reviews so far (repetitions)
+  attempts      DrillAttempt[]
+  planItems     PlanItem[]
+  createdAt     DateTime       @default(now())
+
+  @@index([userId, theme])
+  @@index([userId, dueAt])
+}
+
+// Every solve attempt, for progress display (2.2a) and SRS scheduling (2.3).
+model DrillAttempt {
+  id          String   @id @default(cuid())
+  drillId     String
+  drill       Drill    @relation(fields: [drillId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  solved      Boolean
+  playedUci   String? // what the user tried this attempt
+  timeSpentMs Int?
+  createdAt   DateTime @default(now())
+
+  @@index([drillId])
+  @@index([userId])
+}
+
+// Lichess puzzle DB slice (plans/phase-2.md 2.2b), ingested by the theme-mapped
+// script in apps/worker/scripts. Populated at deploy time, read by plan
+// generation to mix thematic master-position drills into weekly plans.
+model Puzzle {
+  id          String   @id @default(cuid())
+  externalId  String   @unique // Lichess puzzle id
+  fen         String   // start position; the side to move solves
+  solutionUci String   // first move of the solution line (UCI)
+  line        String   // full solution line (UCI, space-separated)
+  rating      Int      // puzzle difficulty (approx. playing strength)
+  themes      String // space-separated Lichess theme tags (raw, for debugging)
+  category    String // mapped WeaknessCategory
+  createdAt   DateTime @default(now())
+
+  @@index([category, rating])
+}
+
+// Engine-eval cache (plans/phase-2.md 2.2b): fixed-depth evals are
+// deterministic, so (fen, depth, kind) -> eval is safe to persist across jobs.
+model EvalCache {
+  fen      String
+  depth    Int
+  kind     String // engine kind (adapter name) — evals differ per engine
+  evalJson Json // EngineEval
+  createdAt DateTime @default(now())
+
+  @@id([fen, depth, kind])
+}
+
+// ── Accountability loop (plans/phase-2.md 2.4) ───────────────────────────────
+
+// One row per user: the weekly check-in streak. Weeks are Monday 00:00 UTC
+// (same weekStartFor math as training plans). lastNudgeWeekStart makes the
+// worker's weekly nudge email idempotent — at most one per user per week.
+model Streak {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak        Int       @default(0) // consecutive weeks with a check-in
+  longestStreak        Int       @default(0)
+  lastCheckInWeekStart DateTime? // weekStart of the most recent check-in
+  lastNudgeWeekStart   DateTime? // week the user was last nudged about
+  updatedAt            DateTime  @updatedAt
+}
+
+// One check-in per user per week (unique) — the act of showing up and marking
+// the week done. Rating snapshots are taken at check-in time.
+model CheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart DateTime // Monday 00:00 UTC of the checked-in week
+  createdAt DateTime @default(now())
+
+  @@unique([userId, weekStart])
+}
+
+// A rating datapoint for the progress chart. Snapshots are taken at check-in
+// (and backfilled once from Lichess's rating history on first snapshot).
+// (userId, source, perf, ratedAt) unique makes writes idempotent.
+model RatingSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source    String // 'lichess' | 'chesscom'
+  perf      String // 'blitz' | 'rapid' | 'classical'
+  rating    Int
+  ratedAt   DateTime // when the platform recorded this rating
+  createdAt DateTime @default(now())
+
+  @@unique([userId, source, perf, ratedAt])
+  @@index([userId, source, perf])
 }
