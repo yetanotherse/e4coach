@@ -91,7 +91,8 @@ export default async function PlanPage() {
                         className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3 hover:border-brand"
                       >
                         <span className="text-sm">
-                          {solved ? '✓' : '○'} {d.solutionSan ? `Find ${d.solutionSan}` : 'Find the better move'}
+                          {solved ? '✓' : '○'}{' '}
+                          {solved && d.solutionSan ? `Find ${d.solutionSan}` : 'Find the better move'}
                           {d.playedMoveSan && (
                             <span className="text-neutral-400"> (instead of {d.playedMoveSan})</span>
                           )}
