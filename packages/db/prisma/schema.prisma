@@ -192,11 +192,19 @@ model Drill {
   gameId        String? // source game id (ties to the report example)
   puzzleId      String? // Lichess puzzle id (type = 'puzzle', plans/phase-2.md 2.2b)
   note          String? // deterministic factual note from the report
+  // SM-2-lite scheduling state (plans/phase-2.md 2.3). Null lastReviewedAt =
+  // never reviewed (new drill); such drills are due immediately.
+  intervalDays   Int       @default(0) // days until next review after last solve
+  ease           Float     @default(2.5) // SM-2 easiness factor, clamped ≥ 1.3
+  dueAt          DateTime  @default(now()) // next review time; overdue = due
+  lastReviewedAt DateTime?
+  reviewCount    Int       @default(0) // successful reviews so far (repetitions)
   attempts      DrillAttempt[]
   planItems     PlanItem[]
   createdAt     DateTime       @default(now())
 
   @@index([userId, theme])
+  @@index([userId, dueAt])
 }
 
 // Every solve attempt, for progress display (2.2a) and SRS scheduling (2.3).

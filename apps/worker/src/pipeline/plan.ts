@@ -12,6 +12,7 @@ import {
   buildPlanMessages,
   CATEGORY_META,
   DEFAULT_MAX_THEMES,
+  pickResurfaceDrills,
   PLAN_JSON_SCHEMA,
   LlmPlanSchema,
   type GoalFacts,
@@ -81,6 +82,7 @@ export async function generateTrainingPlan(
     include: { items: true },
   });
 
+  const linkedDrillIds = new Set<string>();
   for (const item of plan.items) {
     const drillsForTheme = draft.items.find((d) => d.theme === item.theme)?.drills ?? [];
     for (const drill of drillsForTheme) {
@@ -120,11 +122,34 @@ export async function generateTrainingPlan(
         where: { id: item.id },
         data: { drills: { connect: { id: drillId } } },
       });
+      linkedDrillIds.add(drillId);
+    }
+  }
+
+  // Recurring-theme resurfacing (plans/phase-2.md 2.3): due drills whose theme
+  // is one of this week's focus themes are linked into the plan too, so spaced
+  // repetition resurfaces them in context. Most overdue first, a few per theme.
+  const dueDrills = await db.drill.findMany({
+    where: { userId: input.userId, dueAt: { lte: now }, theme: { in: focusThemes } },
+    select: { id: true, theme: true, dueAt: true },
+  });
+  let resurfaced = 0;
+  for (const item of plan.items) {
+    const ids = pickResurfaceDrills(dueDrills, item.theme, linkedDrillIds);
+    for (const id of ids) {
+      await db.planItem.update({
+        where: { id: item.id },
+        data: { drills: { connect: { id } } },
+      });
+      linkedDrillIds.add(id);
+      resurfaced++;
     }
   }
 
   const drillTotal = draft.items.reduce((n, i) => n + i.drills.length, 0);
-  console.log(`[plan] plan ${plan.id} created (${items.length} themes, ${drillTotal} drills)`);
+  console.log(
+    `[plan] plan ${plan.id} created (${items.length} themes, ${drillTotal} drills, ${resurfaced} resurfaced)`,
+  );
   return plan.id;
 }
 
@@ -154,13 +179,16 @@ async function fetchPuzzleCandidates(
         rating: r.rating,
       }));
     } catch (err) {
-      console.warn(`[plan] puzzle candidates for ${theme} unavailable:`, err instanceof Error ? err.message : err);
+      console.warn(
+        `[plan] puzzle candidates for ${theme} unavailable:`,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
   return out;
 }
 
-/** Try to rephrase the template goals with the LLM; fall back on any failure. */async function phraseGoals(
+/** Try to rephrase the template goals with the LLM; fall back on any failure. */ async function phraseGoals(
   draft: PlanDraft,
   profile: WeaknessProfile,
   llm: LlmProvider,
@@ -185,7 +213,10 @@ async function fetchPuzzleCandidates(
     if (!parsed.success) return template;
     return mergeOnlyKnownThemes(template, parsed.data);
   } catch (err) {
-    console.warn('[plan] LLM goal phrasing failed, using template goals:', err instanceof Error ? err.message : err);
+    console.warn(
+      '[plan] LLM goal phrasing failed, using template goals:',
+      err instanceof Error ? err.message : err,
+    );
     return template;
   }
 }

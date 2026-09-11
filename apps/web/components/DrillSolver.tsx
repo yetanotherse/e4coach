@@ -24,9 +24,16 @@ type Phase = 'solving' | 'wrong' | 'solved';
  * Solve flow: make the move you should have played. Wrong tries snap back and
  * are recorded (solved:false); the correct move records solved:true and shows
  * the grounded explanation from the report. The user's original mistake is
- * only revealed after solving.
+ * only revealed after solving. `backHref` sends the user back to where they
+ * came from (the plan, or the review queue).
  */
-export function DrillSolver({ drill }: { drill: DrillData }) {
+export function DrillSolver({
+  drill,
+  backHref = '/plan',
+}: {
+  drill: DrillData;
+  backHref?: string;
+}) {
   const [phase, setPhase] = useState<Phase>('solving');
   const [tries, setTries] = useState(0);
   const [hinted, setHinted] = useState(false);
@@ -85,8 +92,8 @@ export function DrillSolver({ drill }: { drill: DrillData }) {
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
       <div className="mb-4 flex items-center justify-between">
-        <a href="/plan" className="text-sm text-brand hover:underline">
-          ← Back to plan
+        <a href={backHref} className="text-sm text-brand hover:underline">
+          ← Back
         </a>
         <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-600">
           {drill.themeName}
@@ -140,11 +147,11 @@ export function DrillSolver({ drill }: { drill: DrillData }) {
             {drill.note && <p className="mt-2 text-neutral-600">{drill.note}</p>}
           </div>
           <button
-            onClick={() => (window.location.href = '/plan')}
+            onClick={() => (window.location.href = backHref)}
             disabled={saving}
             className="w-full rounded-lg bg-brand px-4 py-2.5 font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
           >
-            {saving ? 'Saving…' : 'Back to plan'}
+            {saving ? 'Saving…' : 'Done'}
           </button>
         </div>
       )}

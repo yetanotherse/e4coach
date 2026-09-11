@@ -81,9 +81,15 @@
 
 **Verification:** fixture-driven unit tests for plan assembly + drill scoring; Playwright: report → plan → solve a drill.
 
-## 2.3 — Spaced repetition
+## 2.3 — Spaced repetition *(DONE 2026-09)*
 
-- SM-2-lite scheduling on `Drill` (interval, ease, dueAt), review-queue page ("review due drills"), recurring-theme resurfacing in weekly plans, `review_completed` analytics.
+1. **Schema** ✅ — migration `0000000000008_drill_srs`: `Drill` gains SM-2-lite state (`intervalDays`, `ease`, `dueAt`, `lastReviewedAt`, `reviewCount`). Defaults backfill existing drills as due-now; new index `[userId, dueAt]`.
+2. **SM-2-lite core** ✅ — `core/src/plan/srs.ts`: clean solve → 1d, then 3d, then interval × ease (cap 180d); grind solve (any failed tries since the last review) → ease −0.2 (floor 1.3), progress reset, back in 1d. Scheduling advances **only on the solve attempt** — wrong tries count as lapses for that solve, they don't reschedule by themselves.
+3. **Wiring** ✅ — the attempt route updates the drill's SRS state after a solved attempt and emits `review_completed` (with lapses + next interval) when the solved drill was due; new-drill first solves count as reviews (dueAt defaults to now).
+4. **Review queue** ✅ — `/review` lists due drills most-overdue-first ("Start review" → first due drill); the drill solver takes `?from=review` and returns to the queue; dashboard shows a "Review due drills" card when any are due.
+5. **Recurring-theme resurfacing** ✅ — plan generation links up to 3 due drills per focus theme (most overdue first, `pickResurfaceDrills`) into the new week's plan items, on top of the fresh draft drills.
+
+**Verification done:** 14 SRS unit tests + 5 plan-generation tests (resurfacing selection, caps, dedupe re-link preserves SRS state); 284 tests + lint + typecheck + web build green; migration deployed to Supabase; live smoke script (`apps/worker/scripts/srsSmoke.ts`, cleans up after itself): new drill due immediately → clean solve +1d → grind solve ease 2.3/reset → re-learn → second clean +3d, dueAt/lastReviewedAt persisted, selector filters by theme/excludes linked.
 
 ## 2.4 — Accountability loop
 
