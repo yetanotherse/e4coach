@@ -80,11 +80,15 @@ export async function POST(
     // button and drill solves share one idempotent path (lib/checkin), so the
     // streak advances exactly once per week.
     const checkIn = await recordCheckIn(userId, distinctId, new Date(), 'drill');
-    if (checkIn.created) {
+    // Snapshot when this check-in is new, or when the user has no snapshots at
+    // all (e.g. the check-in was recorded before their username was set — the
+    // per-week idempotency would otherwise block the chart for a whole week).
+    const snapshotCount = await prisma.ratingSnapshot.count({ where: { userId } });
+    if (checkIn.created || snapshotCount === 0) {
       void snapshotRatings(prisma, userId, [
         { source: 'lichess', username: user?.lichessUser ?? null, provider: ratingLichess },
         { source: 'chesscom', username: user?.chessComUser ?? null, provider: ratingChessCom },
-      ]);
+      ]).catch(() => undefined);
     }
 
     const wasDue = isDue(drill.dueAt, new Date());

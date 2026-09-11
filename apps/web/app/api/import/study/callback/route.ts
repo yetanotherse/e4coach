@@ -1,6 +1,7 @@
 import { parseLichessStudies } from '@chess-coach/core';
-import { analytics, env, prisma } from '@/lib/server';
+import { analytics, env, prisma, ratingLichess } from '@/lib/server';
 import { hashEmail } from '@/lib/hash';
+import { snapshotRatings } from '@/lib/ratingSnapshots';
 import {
   consumeStudyFlow,
   exchangeCode,
@@ -58,6 +59,12 @@ export async function GET(req: Request): Promise<Response> {
     create: { email: flow.email, emailHash, lichessUser: username, consentAt: new Date() },
     update: { lichessUser: username, emailHash, consentAt: new Date(), lastSeenAt: new Date() },
   });
+
+  // First rating snapshot as soon as the username exists — otherwise the chart
+  // could stay empty until the next check-in. Best-effort, fire-and-forget.
+  void snapshotRatings(prisma, user.id, [
+    { source: 'lichess', username: user.lichessUser, provider: ratingLichess },
+  ]).catch(() => undefined);
 
   const job = await prisma.analysisJob.create({
     data: { userId: user.id, source: 'lichess-study', status: 'PENDING' },
