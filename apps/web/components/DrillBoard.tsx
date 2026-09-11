@@ -34,12 +34,18 @@ export function DrillBoard({
   fen,
   orientation,
   solutionUci,
+  flashUci,
+  resetSignal,
   onMove,
 }: {
   fen: string;
   orientation: 'white' | 'black';
   /** shown as a green arrow once solved / hinted */
   solutionUci?: string;
+  /** wrong move, briefly shown as a red arrow while the piece snaps back */
+  flashUci?: string;
+  /** bump to snap the board back to `fen` after a wrong try */
+  resetSignal?: number;
   onMove: (from: string, to: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,11 +83,13 @@ export function DrillBoard({
       },
     });
     const shapes: DrawShape[] = [];
-    if (solutionUci && solutionUci.length >= 4) {
+    if (flashUci && flashUci.length >= 4) {
+      shapes.push({ orig: flashUci.slice(0, 2) as Key, dest: flashUci.slice(2, 4) as Key, brush: 'red' });
+    } else if (solutionUci && solutionUci.length >= 4) {
       shapes.push({ orig: solutionUci.slice(0, 2) as Key, dest: solutionUci.slice(2, 4) as Key, brush: 'green' });
     }
     api.setAutoShapes(shapes);
-  }, [fen, orientation, solutionUci]);
+  }, [fen, orientation, solutionUci, flashUci, resetSignal]);
 
   return <div ref={ref} className="aspect-square w-full" />;
 }

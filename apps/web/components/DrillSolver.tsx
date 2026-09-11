@@ -38,6 +38,9 @@ export function DrillSolver({
   const [tries, setTries] = useState(0);
   const [hinted, setHinted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resets, setResets] = useState(0);
+  const [flashUci, setFlashUci] = useState<string | undefined>(undefined);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAt = useRef(Date.now());
 
   // Reset per drill in case the component is reused.
@@ -45,6 +48,9 @@ export function DrillSolver({
     setPhase('solving');
     setTries(0);
     setHinted(false);
+    setResets(0);
+    setFlashUci(undefined);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
     startedAt.current = Date.now();
   }, [drill.id]);
 
@@ -84,6 +90,10 @@ export function DrillSolver({
     }
     setPhase('wrong');
     setTries((t) => t + 1);
+    setResets((r) => r + 1);
+    setFlashUci(playedUci);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashUci(undefined), 800);
     void record(false, playedUci);
   }
   const showHint = hinted || tries >= 3;
@@ -112,6 +122,8 @@ export function DrillSolver({
         fen={drill.fen}
         orientation={drill.sideToMove}
         solutionUci={solved || showHint ? drill.solutionUci : undefined}
+        flashUci={flashUci}
+        resetSignal={resets}
         onMove={onMove}
       />
 
