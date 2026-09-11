@@ -1,8 +1,8 @@
 /** Server-only singletons: env, db, analytics. */
 import 'server-only';
 import { loadEnv } from '@chess-coach/config';
-import { createAnalytics, createBilling, createMailer } from '@chess-coach/adapters';
-import type { Analytics, Billing, Mailer } from '@chess-coach/core';
+import { createAnalytics, createBilling, createMailer, createRatingSourceFor } from '@chess-coach/adapters';
+import type { Analytics, Billing, Mailer, RatingSource } from '@chess-coach/core';
 import { prisma } from '@chess-coach/db';
 import { checkRateLimit, clientIp } from './rateLimit';
 import { initWebSentry } from './sentry';
@@ -19,11 +19,17 @@ const g = globalThis as unknown as {
   analytics?: Analytics;
   mailer?: Mailer;
   billing?: Billing;
+  ratingLichess?: RatingSource;
+  ratingChessCom?: RatingSource;
 };
 export const analytics: Analytics = g.analytics ?? (g.analytics = createAnalytics(env));
 export const mailer: Mailer = g.mailer ?? (g.mailer = createMailer(env));
 // Entitlements only (D-P2-2) — no gateway code; a real adapter plugs in later.
 export const billing: Billing = g.billing ?? (g.billing = createBilling(env));
+// Rating sources (plans/phase-2.md 2.4) — stateless; cached like the rest.
+export const ratingLichess: RatingSource = g.ratingLichess ?? (g.ratingLichess = createRatingSourceFor(env, 'lichess'));
+export const ratingChessCom: RatingSource =
+  g.ratingChessCom ?? (g.ratingChessCom = createRatingSourceFor(env, 'chesscom'));
 
 /**
  * Shared rate-limit gate (plans/phase-2.md 2.0.5). `kind` selects the env-tuned

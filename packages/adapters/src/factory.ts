@@ -6,7 +6,7 @@
  * breaks.
  */
 import type { Env } from '@chess-coach/config';
-import type { Analytics, Billing, ChessEngine, GameSource, LlmProvider, Mailer } from '@chess-coach/core';
+import type { Analytics, Billing, ChessEngine, GameSource, LlmProvider, Mailer, RatingSource } from '@chess-coach/core';
 
 import { MockGameSource } from './mocks/mockGameSource.js';
 import { MockEngine } from './mocks/mockEngine.js';
@@ -14,8 +14,11 @@ import { MockLlmProvider } from './mocks/mockLlm.js';
 import { MockAnalytics } from './mocks/mockAnalytics.js';
 import { MockMailer } from './mocks/mockMailer.js';
 import { MockBilling } from './billing/mockBilling.js';
+import { MockRatingSource } from './mocks/mockRatingSource.js';
 import { LichessGameSource } from './lichess/lichessGameSource.js';
 import { ChessComGameSource } from './chesscom/chessComGameSource.js';
+import { LichessRatingSource } from './rating/lichessRatingSource.js';
+import { ChessComRatingSource } from './rating/chessComRatingSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
 import type { ResilienceOptions } from './llm/resilience.js';
@@ -46,6 +49,21 @@ export function createGameSourceFor(env: Env, source: 'lichess' | 'chesscom'): G
       return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
     case 'chesscom':
       return new ChessComGameSource({ userAgent: env.CHESSCOM_USER_AGENT });
+  }
+}
+
+/**
+ * Rating source selection (plans/phase-2.md 2.4). Same mock rule as game
+ * sources: when GAME_SOURCE=mock (dev/e2e), every platform stays on the mock
+ * so no dev run touches the real rating APIs.
+ */
+export function createRatingSourceFor(env: Env, source: 'lichess' | 'chesscom'): RatingSource {
+  if (env.GAME_SOURCE === 'mock') return new MockRatingSource();
+  switch (source) {
+    case 'lichess':
+      return new LichessRatingSource({ userAgent: env.LICHESS_USER_AGENT });
+    case 'chesscom':
+      return new ChessComRatingSource({ userAgent: env.CHESSCOM_USER_AGENT });
   }
 }
 

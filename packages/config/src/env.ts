@@ -108,6 +108,12 @@ const EnvSchema = z.object({
   // killing the worker can't loop forever.
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
 
+  // Weekly nudge email (plans/phase-2.md 2.4). Scanned at most once per
+  // interval; each user is nudged at most once per calendar week.
+  NUDGE_ENABLED: boolish.default('true'),
+  NUDGE_SCAN_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
+  NUDGE_MAX_PER_SCAN: z.coerce.number().int().positive().default(50),
+
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
 

@@ -130,6 +130,15 @@ async function main(): Promise<void> {
     signal: controller.signal,
     staleJobMs: env.WORKER_STALE_JOB_MS,
     maxAttempts: env.WORKER_MAX_ATTEMPTS,
+    ...(env.NUDGE_ENABLED
+      ? {
+          nudge: {
+            deps: { db: prisma, mailer: deps.mailer, analytics: deps.analytics },
+            opts: { appUrl: env.APP_URL, maxPerScan: env.NUDGE_MAX_PER_SCAN },
+            scanIntervalMs: env.NUDGE_SCAN_INTERVAL_MS,
+          },
+        }
+      : {}),
   });
   await deps.engine.dispose();
   await deps.analytics.flush();
