@@ -59,20 +59,17 @@ export async function evaluateGame(
   let toEval = [...needed].filter((fen) => !cache.has(fen));
 
   // Cross-job cache hits (fixed depth only — deterministic, reproducible).
+  // Batched: one query for all FENs (per-fen fan-out exhausts the Prisma pool).
   if (opts.evalCache && opts.depth) {
-    const hits = await Promise.all(
-      toEval.map(async (fen) => ({ fen, hit: await opts.evalCache!.get(fen) })),
-    );
-    for (const { fen, hit } of hits) {
-      if (hit) cache.set(fen, hit);
-    }
+    const hits = await opts.evalCache.getMany(toEval);
+    for (const [fen, hit] of hits) cache.set(fen, hit);
     toEval = toEval.filter((fen) => !cache.has(fen));
   }
 
   const results = await Promise.all(toEval.map((fen) => engine.evaluate(fen, evalOpts)));
   toEval.forEach((fen, i) => cache.set(fen, results[i]!));
   if (opts.evalCache && opts.depth) {
-    await Promise.all(toEval.map((fen, i) => opts.evalCache!.set(fen, results[i]!)));
+    await opts.evalCache.setMany(new Map(toEval.map((fen, i) => [fen, results[i]!])));
   }
 
   return { lookup: (fen: string) => cache.get(fen), evalCount: toEval.length };
