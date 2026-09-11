@@ -64,8 +64,10 @@ const EnvSchema = z.object({
   DEEP_ANALYSIS_PV_PLIES: z.coerce.number().int().min(2).max(12).default(6),
 
   // Game source
-  GAME_SOURCE: z.enum(['mock', 'lichess']).default('mock'),
+  GAME_SOURCE: z.enum(['mock', 'lichess', 'chesscom']).default('mock'),
   LICHESS_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),
+  // Chess.com 403s generic UAs — the UA must carry a contact identity.
+  CHESSCOM_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),
   // Hard ceiling on live-fetched games per job. Must be >= the largest option
   // in the signup dropdown (currently 60), otherwise a user's selection is
   // silently clamped down by the worker (runner.ts requestedMax = min(...)).

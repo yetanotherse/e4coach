@@ -2,6 +2,7 @@ export * from './factory.js';
 
 // Real adapters (also exported directly for tests + explicit wiring)
 export { LichessGameSource, type LichessOptions } from './lichess/lichessGameSource.js';
+export { ChessComGameSource, parseClocksCs } from './chesscom/chessComGameSource.js';
 export { StockfishNativeEngine, type StockfishNativeOptions } from './stockfish/nativeEngine.js';
 export { GeminiFlashProvider, type GeminiOptions } from './llm/geminiProvider.js';
 export { PostHogAnalytics, type PostHogOptions } from './analytics/posthogAnalytics.js';

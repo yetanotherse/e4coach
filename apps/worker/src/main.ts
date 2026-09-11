@@ -8,7 +8,7 @@ import { loadEnv, dbFingerprint } from '@chess-coach/config';
 import {
   createAnalytics,
   createEngine,
-  createGameSource,
+  createGameSourceFor,
   createLlmProvider,
   createMailer,
 } from '@chess-coach/adapters';
@@ -37,7 +37,8 @@ async function main(): Promise<void> {
   }
 
   const deps = {
-    gameSource: createGameSource(env),
+    gameSource: createGameSourceFor(env, 'lichess'),
+    chessComSource: createGameSourceFor(env, 'chesscom'),
     engine: createEngine(env),
     // Token telemetry: a job now makes ~8 LLM calls (one report + one per
     // explanation batch) instead of one, so unmetered usage is no longer fine.
@@ -65,6 +66,7 @@ async function main(): Promise<void> {
 
   console.log('[worker] started', {
     gameSource: deps.gameSource.name,
+    chessComSource: deps.chessComSource.name,
     engine: deps.engine.name,
     enginePool: env.ENGINE_POOL_SIZE,
     engineThreads: env.ENGINE_THREADS,

@@ -37,11 +37,13 @@
 
 **Verification done:** lint/typecheck/233 unit tests green (incl. new otp/rateLimit/tokenEdge tests); web build green with middleware; live smoke: otp request → verify → httpOnly 30-day session cookie set → replay rejected; rate-limit upsert verified against Supabase; signup smoke with mock mailer. OTP happy-path e2e is impractical (mock mailer is in-process) — covered by unit tests + manual smoke instead.
 
-## 2.1 — Chess.com game source
+## 2.1 — Chess.com game source *(DONE 2026-09)*
 
-1. `ChessComGameSource` in `packages/adapters` — public API monthly archives (`/pub/player/{u}/games/{yyyy}/{mm}`), Zod response schemas, 429/5xx backoff (mirror Lichess adapter), standard-variant + rated filter, injectable fetch, record/replay fixture tests.
-2. Wire through `factory.ts`, worker FETCHING stage, `AnalysisJob.source` enum.
-3. Dashboard source picker (Lichess / Chess.com / PGN / studies).
+1. **`ChessComGameSource`** ✅ — `packages/adapters/src/chesscom/`: archives list (sorted newest-first — the API returns them unsorted) walked newest→oldest until `max` collected; Zod-validated responses; rules=chess + rated/time_class filters; 429/5xx backoff with Retry-After; `[ECO]` code from PGN tags (the API's `eco` field is a URL); per-move clocks parsed from `[%clk]` PGN comments into centiseconds (enables the TIME_TROUBLE detector); injectable fetch with fixture tests.
+2. **Wiring** ✅ — `createGameSourceFor(env, source)` factory (mock env → always mock, so dev/e2e are unaffected); worker `RunDeps.chessComSource` + per-source username checks in the FETCHING stage; poller passes `chessComUser`.
+3. **UI + routes** ✅ — `SignupSchema` gained `source` + `chessComUser` (superRefine requires the matching username); signup/analyze routes create jobs with the chosen platform (env default respected for backward compat); `SignupForm` gets a Lichess/Chess.com toggle; `DashboardActions` gets a platform select limited to usernames on file.
+
+**Verification done:** 11 new adapter tests + 3 runner tests (chesscom success path, missing username, missing source config); live smoke against the real Chess.com API (20 games fetched and mapped correctly); lint/typecheck/244 tests/web build green.
 
 ## 2.2 — Training plans + drills (the core value; largest)
 

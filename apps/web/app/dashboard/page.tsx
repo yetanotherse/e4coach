@@ -43,10 +43,15 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Your reports</h1>
           <p className="mt-1 text-neutral-600">
-            {user.lichessUser ? `Lichess: ${user.lichessUser}` : 'No Lichess username on file'}
+            {[
+              user.lichessUser ? `Lichess: ${user.lichessUser}` : null,
+              user.chessComUser ? `Chess.com: ${user.chessComUser}` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'No chess username on file'}
           </p>
         </div>
-        <DashboardActions />
+        <DashboardActions lichessUser={user.lichessUser} chessComUser={user.chessComUser} />
       </div>
 
       <ul className="mt-10 space-y-3">
