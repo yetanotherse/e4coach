@@ -52,6 +52,15 @@
 > - **2.2b — Puzzle drills + polish:** Lichess puzzle DB ingestion (theme-tag filtered slice → `Puzzle` table), thematic master-position drills mixed into weekly plans, drill scoring/accuracy feedback, eval cache (`EvalCache`) for drill re-evaluation.
 > Rationale: 2.2a delivers the full coach loop (profile → plan → drill → solve) on data we already have; 2.2b adds the external content slice without blocking the core loop.
 
+### 2.2a — DONE (2026-09)
+
+1. **Schema** ✅ — migration `0000000000006_training_plans`: `TrainingPlan` (one active per user+weekStart; re-analysis supersedes), `PlanItem` (theme + goal), `Drill` (**user-owned**, m-n linked to plan items, deduped by userId+theme+fen+solutionUci so drills survive re-analysis and can recur weekly — SRS-ready), `DrillAttempt`.
+2. **Core plan module** ✅ — `buildPlanDraft(profile)`: top themes by impact (≤2), drills from real report examples (≤5/theme), Monday-UTC weekStart, template goals from `CATEGORY_META`; `prompts/plan.ts` LLM goal phrasing with the report prompt's grounding contract (unknown themes rejected; any failure → template goals).
+3. **Worker** ✅ — `pipeline/plan.ts` runs after report persist; failure logged, never fails the job.
+4. **Web** ✅ — `/plan` (focus themes, goals, drill list with ✓ solved state, "Continue training" → first unsolved drill); `/plan/drill/[id]` solve flow (user-owned check, interactive Chessground with legal-move dests, wrong-try snap-back + attempt recorded, hint after 3 tries or on demand, grounded note + "you had played X" on solve); `POST /api/drills/[id]/attempt` (session-owner enforced, Zod-validated); dashboard "This week's plan" card; `drill_attempted`/`drill_solved` analytics events.
+
+**Verification done:** unit tests (weekStart math, theme focus/caps, drill facts copied verbatim, skip-empty themes, goal counts); 254 tests + lint + typecheck + web build green; live full-stack smoke (mock adapters): signup → job → report → plan auto-created with 7 deduped drills across 2 themes, correctly linked.
+
 1. **Schema:** `TrainingPlan` (userId, weekStart, sourceReportId, status), `PlanItem` (theme/taxonomy id, goal prose, drill refs), `Drill` (userId, type `own_game | puzzle`, sourceGameId/puzzleId, fen, solution line, taxonomy theme), `DrillAttempt` (drillId, solved, moveAccuracy, timeSpent).
 2. **Plan generator** (`packages/core`): WeaknessProfile → weekly plan (top 2 themes × 4–6 drills each); LLM (existing `LlmProvider` port, JSON-schema, grounding contract) writes goals/motivation only; deterministic assembly + template fallback.
 3. **Own-game drills:** reuse stored `Game` rows + `ErrorInstance` examples; solve flow = position FEN + "find the move you missed", feedback via existing engine eval + `explain.ts` narration.
