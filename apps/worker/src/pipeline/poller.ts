@@ -90,6 +90,7 @@ export async function processNextJob(deps: RunDeps): Promise<boolean> {
         email: user.email,
         emailHash: user.emailHash,
         lichessUser: user.lichessUser,
+        chessComUser: user.chessComUser,
       },
       deps,
     );

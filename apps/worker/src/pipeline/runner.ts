@@ -31,6 +31,8 @@ import { sendReportReadyEmail } from './notify.js';
 export interface RunDeps {
   db?: PrismaClient;
   gameSource: GameSource;
+  /** chess.com live source (plans/phase-2.md 2.1); used when job.source === 'chesscom' */
+  chessComSource?: GameSource;
   engine: ChessEngine;
   llm: LlmProvider;
   analytics: Analytics;
@@ -83,6 +85,7 @@ export interface UserRecord {
   email: string;
   emailHash: string | null;
   lichessUser: string | null;
+  chessComUser: string | null;
 }
 
 /** Run a single job end-to-end. Returns the created report's public slug. */
@@ -95,16 +98,25 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
   };
 
   const stored = isStoredSource(job.source);
-  // Live sources need a Lichess account to fetch from; stored sources (studies,
-  // PGN uploads) already have their games in the DB and may have no username.
-  // PGN uploads aren't tied to any account — the user could have a stale
-  // lichessUser on their row from an earlier flow — so always address them as
-  // "you" rather than leaking an unrelated username.
+  const isChessCom = job.source === 'chesscom';
+  // Live sources need an account on their platform to fetch from; stored
+  // sources (studies, PGN uploads) already have their games in the DB and may
+  // have no username. PGN uploads aren't tied to any account — the user could
+  // have a stale lichessUser on their row from an earlier flow — so always
+  // address them as "you" rather than leaking an unrelated username.
   const displayName =
     job.source === 'pgn' ? 'you' : (user.lichessUser ?? user.email.split('@')[0] ?? 'You');
 
   try {
-    if (!stored && !user.lichessUser) throw new Error('user has no lichess username');
+    if (!stored) {
+      const username = isChessCom ? user.chessComUser : user.lichessUser;
+      if (!username) {
+        throw new Error(isChessCom ? 'user has no chess.com username' : 'user has no lichess username');
+      }
+      if (isChessCom && !deps.chessComSource) {
+        throw new Error('chess.com game source not configured on this worker');
+      }
+    }
 
     // ── Stage 1: obtain games ───────────────────────────────────────
     // Pre-stored sources (studies, PGN uploads) load from the DB; live sources fetch.
@@ -124,7 +136,9 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
       console.log(
         `[runner] job ${job.id} live fetch: up to ${requestedMax} (selected ${job.params?.maxGames ?? 'default'}, cap ${deps.maxGames})`,
       );
-      games = await deps.gameSource.fetchRecentGames(user.lichessUser!, {
+      const liveSource = isChessCom ? deps.chessComSource : deps.gameSource;
+      const username = isChessCom ? user.chessComUser : user.lichessUser;
+      games = await liveSource!.fetchRecentGames(username!, {
         max: requestedMax,
         rated: true,
         perfTypes,

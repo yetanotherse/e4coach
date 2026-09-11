@@ -15,6 +15,7 @@ import { MockAnalytics } from './mocks/mockAnalytics.js';
 import { MockMailer } from './mocks/mockMailer.js';
 import { MockBilling } from './billing/mockBilling.js';
 import { LichessGameSource } from './lichess/lichessGameSource.js';
+import { ChessComGameSource } from './chesscom/chessComGameSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
 import type { ResilienceOptions } from './llm/resilience.js';
@@ -27,6 +28,24 @@ export function createGameSource(env: Env): GameSource {
       return new MockGameSource();
     case 'lichess':
       return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
+    case 'chesscom':
+      return new ChessComGameSource({ userAgent: env.CHESSCOM_USER_AGENT });
+  }
+}
+
+/**
+ * Per-job live game source selection (plans/phase-2.md 2.1): users pick their
+ * platform at signup, so the worker needs whichever source that job names.
+ * When GAME_SOURCE=mock (dev/e2e), every request stays on the mock regardless
+ * of the platform chosen.
+ */
+export function createGameSourceFor(env: Env, source: 'lichess' | 'chesscom'): GameSource {
+  if (env.GAME_SOURCE === 'mock') return new MockGameSource();
+  switch (source) {
+    case 'lichess':
+      return new LichessGameSource({ userAgent: env.LICHESS_USER_AGENT });
+    case 'chesscom':
+      return new ChessComGameSource({ userAgent: env.CHESSCOM_USER_AGENT });
   }
 }
 
