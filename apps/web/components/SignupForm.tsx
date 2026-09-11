@@ -6,11 +6,16 @@ import { track } from '@/lib/track';
 
 const PERF_OPTIONS = ['bullet', 'blitz', 'rapid', 'classical'] as const;
 const GAME_COUNT_OPTIONS = [20, 30, 40, 60];
+const PLATFORMS = [
+  { id: 'lichess', label: 'Lichess', placeholder: 'e.g. DrNykterstein' },
+  { id: 'chesscom', label: 'Chess.com', placeholder: 'e.g. hikaru' },
+] as const;
 
 export function SignupForm() {
   const router = useRouter();
+  const [platform, setPlatform] = useState<'lichess' | 'chesscom'>('lichess');
   const [email, setEmail] = useState('');
-  const [lichessUser, setLichessUser] = useState('');
+  const [username, setUsername] = useState('');
   const [consent, setConsent] = useState(false);
   const [maxGames, setMaxGames] = useState(30);
   const [perfTypes, setPerfTypes] = useState<string[]>(['blitz', 'rapid', 'classical']);
@@ -33,10 +38,18 @@ export function SignupForm() {
     setSubmitting(true);
     track('signup_submitted');
     try {
+      const body = {
+        email,
+        ...(platform === 'lichess' ? { lichessUser: username } : { chessComUser: username }),
+        source: platform,
+        consent,
+        maxGames,
+        perfTypes,
+      };
       const res = await fetch('/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, lichessUser, consent, maxGames, perfTypes }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
@@ -51,17 +64,38 @@ export function SignupForm() {
     }
   }
 
+  const active = PLATFORMS.find((p) => p.id === platform)!;
+
   return (
     <form onSubmit={onSubmit} className="w-full max-w-md space-y-4">
+      <div className="flex gap-1 rounded-lg bg-neutral-100 p-1">
+        {PLATFORMS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => {
+              setPlatform(p.id);
+              setUsername('');
+            }}
+            className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              platform === p.id
+                ? 'bg-white text-neutral-900 shadow-sm'
+                : 'text-neutral-500 hover:text-neutral-800'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
       <div>
-        <label htmlFor="lichess" className="block text-sm font-medium text-neutral-700">
-          Your Lichess username
+        <label htmlFor="username" className="block text-sm font-medium text-neutral-700">
+          Your {active.label} username
         </label>
         <input
-          id="lichess"
-          value={lichessUser}
-          onChange={(e) => setLichessUser(e.target.value)}
-          placeholder="e.g. DrNykterstein"
+          id="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder={active.placeholder}
           required
           className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
         />

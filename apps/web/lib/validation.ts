@@ -6,7 +6,15 @@ const lichessUsername = z
   .trim()
   .min(2, 'Please enter your Lichess username.')
   .max(30, "That username is too long — please check it's correct.")
-  .regex(/^[\w-]+$/, 'That doesn’t look like a valid Lichess username.');
+  .regex(/^[\w-]+$/, "That doesn't look like a valid Lichess username.");
+
+/** Chess.com usernames: letters, digits, underscore, hyphen; 3–25 chars. */
+const chessComUsername = z
+  .string()
+  .trim()
+  .min(3, 'Please enter your Chess.com username.')
+  .max(25, "That username is too long — please check it's correct.")
+  .regex(/^[\w-]+$/, "That doesn't look like a valid Chess.com username.");
 
 /** User-selectable analysis scope. Server hard-caps count. */
 export const PERF_TYPES = ['ultrabullet', 'bullet', 'blitz', 'rapid', 'classical'] as const;
@@ -29,14 +37,44 @@ export const JobParamsSchema = z.object({
 });
 export type JobParamsInput = z.infer<typeof JobParamsSchema>;
 
-export const SignupSchema = z.object({
-  email,
-  lichessUser: lichessUsername,
-  consent,
-  maxGames: JobParamsSchema.shape.maxGames,
-  perfTypes,
-});
+/**
+ * Which platform's recent games to analyze (plans/phase-2.md 2.1). Optional for
+ * backward compatibility with older clients; defaults to the server's
+ * GAME_SOURCE env. Exactly the matching username is required.
+ */
+export const SignupSourceSchema = z.enum(['lichess', 'chesscom']).optional();
+
+export const SignupSchema = z
+  .object({
+    email,
+    lichessUser: lichessUsername.optional(),
+    chessComUser: chessComUsername.optional(),
+    source: SignupSourceSchema,
+    consent,
+    maxGames: JobParamsSchema.shape.maxGames,
+    perfTypes,
+  })
+  .superRefine((v, ctx) => {
+    const source = v.source ?? 'lichess';
+    if (source === 'lichess' && !v.lichessUser) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['lichessUser'],
+        message: 'Please enter your Lichess username.',
+      });
+    }
+    if (source === 'chesscom' && !v.chessComUser) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['chessComUser'],
+        message: 'Please enter your Chess.com username.',
+      });
+    }
+  });
 export type SignupInput = z.infer<typeof SignupSchema>;
+
+/** Analyze route body: optional platform pick (defaults to the server env). */
+export const AnalyzeSchema = z.object({ source: SignupSourceSchema });
 
 /**
  * Start the Lichess-studies OAuth import (email captured before redirect).

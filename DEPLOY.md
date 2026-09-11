@@ -36,7 +36,11 @@ For the very first migration from the schema, run `prisma migrate dev --name ini
 - Env vars: `DATABASE_URL`, `DIRECT_URL`, `APP_URL` (your Vercel URL), `AUTH_SECRET`,
   `LLM_PROVIDER=mock` *(web never calls the LLM; worker does)*, `ANALYTICS_PROVIDER=posthog`,
   `POSTHOG_KEY`, `POSTHOG_HOST`, `MAILER_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM`,
-  `GAME_SOURCE=lichess`.
+  `GAME_SOURCE=lichess`,
+  `SENTRY_DSN` *(optional; error monitoring for the server runtime)*,
+  `RATE_LIMIT_ENABLED` / `RATE_LIMIT_AUTH_PER_MIN` / `RATE_LIMIT_SIGNUP_PER_MIN` /
+  `RATE_LIMIT_TRACK_PER_MIN` *(plans/phase-2.md 2.0.5; defaults are fine to start)*,
+  `BILLING_PROVIDER=mock` *(plans/phase-2.md 2.5 — stub only, gateway deferred)*.
 - The web tier only enqueues jobs and reads reports — it needs DB + analytics + mailer (for
   magic links), not Stockfish or Gemini.
 

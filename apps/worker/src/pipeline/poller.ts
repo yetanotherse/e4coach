@@ -5,6 +5,7 @@
  */
 import { prisma, type JobStatus, type PrismaClient } from '@chess-coach/db';
 import { runJob, type RunDeps } from './runner.js';
+import { sendWeeklyNudges, type NudgeDeps, type NudgeOptions } from './nudge.js';
 
 /** Non-terminal statuses a running job passes through (see runner setStage). */
 const IN_PROGRESS: JobStatus[] = ['FETCHING', 'EVALUATING', 'CLASSIFYING', 'GENERATING'];
@@ -90,6 +91,7 @@ export async function processNextJob(deps: RunDeps): Promise<boolean> {
         email: user.email,
         emailHash: user.emailHash,
         lichessUser: user.lichessUser,
+        chessComUser: user.chessComUser,
       },
       deps,
     );
@@ -107,10 +109,18 @@ export interface PollLoopOptions {
   staleJobMs: number;
   /** mark FAILED after this many claim attempts */
   maxAttempts: number;
+  /** weekly nudge scan (plans/phase-2.md 2.4); omitted = disabled */
+  nudge?: {
+    deps: NudgeDeps;
+    opts: NudgeOptions;
+    /** minimum gap between scans (ms) */
+    scanIntervalMs: number;
+  };
 }
 
 /** Run the poll loop until aborted. Drains all ready jobs each tick. */
 export async function runPollLoop(deps: RunDeps, opts: PollLoopOptions): Promise<void> {
+  let lastNudgeScanAt = 0; // 0 → the first tick scans (fresh worker catches up)
   while (!opts.signal?.aborted) {
     try {
       // Rescue anything stranded by a killed worker before draining the queue.
@@ -118,6 +128,16 @@ export async function runPollLoop(deps: RunDeps, opts: PollLoopOptions): Promise
       // Drain: keep processing while jobs are available.
       while (await processNextJob(deps)) {
         if (opts.signal?.aborted) return;
+      }
+      // Nudge scan rides the poll loop, rate-limited to once per interval.
+      if (opts.nudge && Date.now() - lastNudgeScanAt >= opts.nudge.scanIntervalMs) {
+        lastNudgeScanAt = Date.now();
+        try {
+          await sendWeeklyNudges(opts.nudge.deps, opts.nudge.opts);
+        } catch (err) {
+          // A failed scan must never disturb job processing.
+          console.error('[poller] nudge scan failed:', err instanceof Error ? err.message : err);
+        }
       }
     } catch (err) {
       console.error('[poller] tick error:', err instanceof Error ? err.message : err);

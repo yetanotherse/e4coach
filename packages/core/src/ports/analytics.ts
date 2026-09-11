@@ -15,7 +15,13 @@ export type AnalyticsEvent =
   | 'report_shared'
   | 'reanalyze_clicked'
   | 'interest_clicked'
-  | 'feedback_submitted';
+  | 'feedback_submitted'
+  // Phase 2 coaching events (plans/phase-2.md)
+  | 'drill_attempted'
+  | 'drill_solved'
+  | 'review_completed'
+  | 'checkin_done'
+  | 'streak_extended';
 
 export interface Analytics {
   readonly name: string;

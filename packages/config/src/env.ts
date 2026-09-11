@@ -64,8 +64,10 @@ const EnvSchema = z.object({
   DEEP_ANALYSIS_PV_PLIES: z.coerce.number().int().min(2).max(12).default(6),
 
   // Game source
-  GAME_SOURCE: z.enum(['mock', 'lichess']).default('mock'),
+  GAME_SOURCE: z.enum(['mock', 'lichess', 'chesscom']).default('mock'),
   LICHESS_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),
+  // Chess.com 403s generic UAs — the UA must carry a contact identity.
+  CHESSCOM_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),
   // Hard ceiling on live-fetched games per job. Must be >= the largest option
   // in the signup dropdown (currently 60), otherwise a user's selection is
   // silently clamped down by the worker (runner.ts requestedMax = min(...)).
@@ -84,6 +86,17 @@ const EnvSchema = z.object({
   EMAIL_FROM: z.string().default('Chess Coach <noreply@example.com>'),
   SENTRY_DSN: z.string().optional(),
 
+  // Billing (plans/phase-2.md 2.5 / D-P2-2). Gateway DEFERRED — the port exists,
+  // only the mock adapter is real. Future values: e.g. 'stripe', 'paddle'.
+  BILLING_PROVIDER: z.enum(['mock']).default('mock'),
+
+  // Rate limiting (plans/phase-2.md 2.0.5) — DB-backed fixed windows per IP.
+  // Fixed 60s windows; values are requests per minute per bucket.
+  RATE_LIMIT_ENABLED: boolish.default('true'),
+  RATE_LIMIT_AUTH_PER_MIN: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_SIGNUP_PER_MIN: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_TRACK_PER_MIN: z.coerce.number().int().positive().default(600),
+
   // Worker
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
   // Stale-job recovery: a job claimed but left in an in-progress state with no
@@ -94,6 +107,12 @@ const EnvSchema = z.object({
   // Give up (mark FAILED) after this many claim attempts, so a job that keeps
   // killing the worker can't loop forever.
   WORKER_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+
+  // Weekly nudge email (plans/phase-2.md 2.4). Scanned at most once per
+  // interval; each user is nudged at most once per calendar week.
+  NUDGE_ENABLED: boolish.default('true'),
+  NUDGE_SCAN_INTERVAL_MS: z.coerce.number().int().positive().default(3_600_000),
+  NUDGE_MAX_PER_SCAN: z.coerce.number().int().positive().default(50),
 
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });
