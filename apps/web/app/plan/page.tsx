@@ -16,7 +16,7 @@ export default async function PlanPage() {
     return (
       <main className="mx-auto max-w-md px-6 py-24">
         <h1 className="text-2xl font-bold">Sign in first</h1>
-        <Link href="/dashboard" className="mt-4 inline-block text-brand underline">
+        <Link href="/login" className="mt-4 inline-block text-brand underline">
           Go to sign in →
         </Link>
       </main>
