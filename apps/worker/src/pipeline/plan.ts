@@ -15,6 +15,8 @@ import {
   pickResurfaceDrills,
   PLAN_JSON_SCHEMA,
   LlmPlanSchema,
+  lichessPuzzleFrom,
+  sanForUci,
   type GoalFacts,
   type PlanDraft,
   type PuzzleCandidate,
@@ -109,6 +111,7 @@ export async function generateTrainingPlan(
               fen: drill.fen,
               sideToMove: drill.sideToMove,
               solutionUci: drill.solutionUci,
+              ...(drill.solutionLine ? { solutionLine: drill.solutionLine } : {}),
               ...(drill.solutionSan ? { solutionSan: drill.solutionSan } : {}),
               ...(drill.playedMoveSan ? { playedMoveSan: drill.playedMoveSan } : {}),
               ...(drill.gameId ? { gameId: drill.gameId } : {}),
@@ -172,12 +175,22 @@ async function fetchPuzzleCandidates(
       const take = 8; // a little slack above the assembler's per-theme cap
       const skip = count > take ? Math.floor(Math.random() * (count - take)) : 0;
       const rows = await db.puzzle.findMany({ where, orderBy: { externalId: 'asc' }, skip, take });
-      out[theme] = rows.map((r) => ({
-        externalId: r.externalId,
-        fen: r.fen,
-        solutionUci: r.solutionUci,
-        rating: r.rating,
-      }));
+      const candidates: PuzzleCandidate[] = [];
+      for (const r of rows) {
+        // Lichess convention: the stored FEN is one move before the puzzle and
+        // the first line move is the opponent's setup move — normalize here.
+        const pz = lichessPuzzleFrom(r.fen, r.line);
+        if (!pz) continue;
+        candidates.push({
+          externalId: r.externalId,
+          fen: pz.fen,
+          solutionUci: pz.solutionUci,
+          solutionLine: pz.solutionLine,
+          solutionSan: sanForUci(pz.fen, pz.solutionUci),
+          rating: r.rating,
+        });
+      }
+      out[theme] = candidates;
     } catch (err) {
       console.warn(
         `[plan] puzzle candidates for ${theme} unavailable:`,

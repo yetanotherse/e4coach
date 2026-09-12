@@ -33,17 +33,20 @@ function destsFor(fen: string): Map<Key, Key[]> {
 export function DrillBoard({
   fen,
   orientation,
-  solutionUci,
+  solutionUcis,
   flashUci,
+  locked,
   resetSignal,
   onMove,
 }: {
   fen: string;
   orientation: 'white' | 'black';
-  /** shown as a green arrow once solved / hinted */
-  solutionUci?: string;
+  /** shown as green arrow(s) once solved / hinted */
+  solutionUcis?: string[];
   /** wrong move, briefly shown as a red arrow while the piece snaps back */
   flashUci?: string;
+  /** true while the opponent's reply is animating or the drill is solved */
+  locked?: boolean;
   /** bump to snap the board back to `fen` after a wrong try */
   resetSignal?: number;
   onMove: (from: string, to: string) => void;
@@ -74,8 +77,9 @@ export function DrillBoard({
       turnColor: orientation,
       movable: {
         free: false,
-        color: orientation,
-        showDests: true,
+        // Locked: no side may move (opponent reply pending, or solved).
+        ...(locked ? { color: undefined } : { color: orientation }),
+        showDests: !locked,
         dests: destsFor(fen),
         events: {
           after: (orig: Key, dest: Key) => onMoveRef.current(orig, dest),
@@ -85,11 +89,15 @@ export function DrillBoard({
     const shapes: DrawShape[] = [];
     if (flashUci && flashUci.length >= 4) {
       shapes.push({ orig: flashUci.slice(0, 2) as Key, dest: flashUci.slice(2, 4) as Key, brush: 'red' });
-    } else if (solutionUci && solutionUci.length >= 4) {
-      shapes.push({ orig: solutionUci.slice(0, 2) as Key, dest: solutionUci.slice(2, 4) as Key, brush: 'green' });
+    } else {
+      for (const uci of solutionUcis ?? []) {
+        if (uci.length >= 4) {
+          shapes.push({ orig: uci.slice(0, 2) as Key, dest: uci.slice(2, 4) as Key, brush: 'green' });
+        }
+      }
     }
     api.setAutoShapes(shapes);
-  }, [fen, orientation, solutionUci, flashUci, resetSignal]);
+  }, [fen, orientation, solutionUcis, flashUci, locked, resetSignal]);
 
   return <div ref={ref} className="aspect-square w-full" />;
 }

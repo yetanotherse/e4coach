@@ -39,6 +39,7 @@ export default async function DrillPage({
     fen: row.fen,
     sideToMove: row.sideToMove === 'black' ? 'black' : 'white',
     solutionUci: row.solutionUci,
+    solutionLine: row.solutionLine,
     solutionSan: row.solutionSan,
     playedMoveSan: row.playedMoveSan,
     gameId: row.gameId,

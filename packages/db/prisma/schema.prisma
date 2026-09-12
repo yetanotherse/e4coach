@@ -189,8 +189,12 @@ model Drill {
   theme         String // WeaknessCategory id
   fen           String // position BEFORE the mistake — the user's move to find
   sideToMove    String // 'white' | 'black' (== the user's color in the game)
-  solutionUci   String // engine's better move (UCI)
+  solutionUci   String // engine's better move — or the puzzle's first solver move (UCI)
   solutionSan   String?
+  // Full multi-move puzzle solution (UCI, space-separated): the solver's moves
+  // alternating with the opponent's replies. Set only for type = 'puzzle';
+  // own-game drills stay single-move (solutionUci).
+  solutionLine  String?
   playedMoveSan String? // what the user actually played (revealed feedback)
   gameId        String? // source game id (ties to the report example)
   puzzleId      String? // Lichess puzzle id (type = 'puzzle', plans/phase-2.md 2.2b)
@@ -232,9 +236,9 @@ model DrillAttempt {
 model Puzzle {
   id          String   @id @default(cuid())
   externalId  String   @unique // Lichess puzzle id
-  fen         String   // start position; the side to move solves
-  solutionUci String   // first move of the solution line (UCI)
-  line        String   // full solution line (UCI, space-separated)
+  fen         String   // position ONE MOVE BEFORE the puzzle; line[0] is the opponent's setup move
+  solutionUci String   // first move of the SOLVER's solution (line index 1, UCI)
+  line        String   // full line (UCI, space-separated; starts with the opponent's setup move)
   rating      Int      // puzzle difficulty (approx. playing strength)
   themes      String // space-separated Lichess theme tags (raw, for debugging)
   category    String // mapped WeaknessCategory

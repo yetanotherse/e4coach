@@ -72,6 +72,7 @@ export function buildPlanDraft(
         fen: p.fen,
         sideToMove: sideToMoveOf(p.fen),
         solutionUci: p.solutionUci,
+        solutionLine: p.solutionLine,
         solutionSan: p.solutionSan ?? sanForUci(p.fen, p.solutionUci),
         puzzleId: p.externalId,
       }));
@@ -94,7 +95,8 @@ export function buildPlanDraft(
   return { weekStart: weekStartFor(now), items };
 }
 
-/** 'b' in the FEN's turn field → black, else white. */
+/** 'b' in the FEN's turn field → black, else white. For puzzle drills, pass
+ * the post-setup-move position (see lichessPuzzleFrom) so this is the solver. */
 export function sideToMoveOf(fen: string): 'white' | 'black' {
   return fen.split(' ')[1] === 'b' ? 'black' : 'white';
 }

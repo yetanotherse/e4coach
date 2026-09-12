@@ -10,6 +10,13 @@
  *
  * The full CSV is ~2GB compressed (~5.9M puzzles). `zstd` must be on PATH for
  * --url downloads (we stream `curl | zstd -dc`).
+ *
+ * Lichess puzzle CSV convention: the FEN is the position one move BEFORE the
+ * puzzle starts and the first move of the space-separated UCI `Moves` column
+ * is the opponent's setup move. The solver holds the opposite color of the
+ * FEN's turn field, and their solution starts at Moves index 1. Raw (fen,
+ * line) pairs are stored verbatim; interpretation happens at plan-assembly
+ * time via lichessPuzzleFrom() in @chess-coach/core.
  */
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
@@ -131,7 +138,9 @@ async function ingestStream(stream: NodeJS.ReadableStream, args: Args): Promise<
       buffer.push({
         externalId: row.externalId,
         fen: row.fen,
-        solutionUci: row.line.split(' ')[0]!,
+        // Lichess convention: the first move in the line is the opponent's
+        // setup move; the solver's solution starts at index 1.
+        solutionUci: row.line.split(' ')[1]!,
         line: row.line,
         rating: row.rating,
         themes: row.themes.join(' '),

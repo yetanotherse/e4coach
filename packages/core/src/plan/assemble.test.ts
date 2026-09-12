@@ -192,9 +192,27 @@ describe('puzzle mixing (2.2b)', () => {
   });
   const puzzles = {
     HANGING_PIECE: [
-      { externalId: 'pz1', fen: FEN_2, solutionUci: 'a2a4', rating: 1200 },
-      { externalId: 'pz2', fen: FEN_1, solutionUci: 'b1c3', rating: 1300 },
-      { externalId: 'pz3', fen: FEN_1, solutionUci: 'c2c4', rating: 1100 },
+      {
+        externalId: 'pz1',
+        fen: FEN_2,
+        solutionUci: 'a2a4',
+        solutionLine: 'a2a4 a7a6 a4a5',
+        rating: 1200,
+      },
+      {
+        externalId: 'pz2',
+        fen: FEN_1,
+        solutionUci: 'b1c3',
+        solutionLine: 'b1c3 b8c6 a2a4',
+        rating: 1300,
+      },
+      {
+        externalId: 'pz3',
+        fen: FEN_1,
+        solutionUci: 'c2c4',
+        solutionLine: 'c2c4 c7c5',
+        rating: 1100,
+      },
     ],
   };
 
@@ -207,10 +225,11 @@ describe('puzzle mixing (2.2b)', () => {
     expect(drills[0]!.type).toBe('own_game');
   });
 
-  it('derives puzzle side to move from the FEN and fills solution SAN', () => {
+  it('derives puzzle side to move from the (post-setup) FEN, copies line, fills SAN', () => {
     const draft = buildPlanDraft(p, { puzzlesByTheme: puzzles, puzzlesPerTheme: 3 });
-    const pz = draft.items[0]!.drills[2]!;
+    const pz = draft.items[0]!.drills[3]!;
     expect(pz.sideToMove).toBe('white'); // FEN_2 turn field
+    expect(pz.solutionLine).toBe('b1c3 b8c6 a2a4'); // pz2
     expect(pz.solutionSan).toBeTruthy(); // SAN computed via chess.js
     expect(pz.gameId).toBeUndefined();
     expect(pz.playedMoveSan).toBeUndefined();
@@ -223,7 +242,15 @@ describe('puzzle mixing (2.2b)', () => {
     });
     const draft = buildPlanDraft(onlyPuzzles, {
       puzzlesByTheme: {
-        ENDGAME_TECHNIQUE: [{ externalId: 'pz9', fen: FEN_1, solutionUci: 'a2a3', rating: 1000 }],
+        ENDGAME_TECHNIQUE: [
+          {
+            externalId: 'pz9',
+            fen: FEN_1,
+            solutionUci: 'a2a3',
+            solutionLine: 'a2a3 a7a5',
+            rating: 1000,
+          },
+        ],
       },
     });
     expect(draft.items).toHaveLength(1);

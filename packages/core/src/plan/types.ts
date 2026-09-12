@@ -9,11 +9,17 @@ import type { WeaknessCategory } from '../taxonomy.js';
 export interface DrillDraft {
   type: 'own_game' | 'puzzle';
   theme: WeaknessCategory;
-  /** position BEFORE the mistake — or the puzzle's start position */
+  /** position BEFORE the mistake — or the puzzle's start position (already post-opponent-setup) */
   fen: string;
   sideToMove: 'white' | 'black';
   /** engine's better move — or the puzzle's first solution move (UCI) */
   solutionUci: string;
+  /**
+   * Full solution line for multi-move puzzles (UCI, space-separated): the
+   * solver's moves alternating with the opponent's replies. Single-move
+   * drills (own_game) leave this unset.
+   */
+  solutionLine?: string;
   solutionSan?: string;
   /** what the user actually played (own_game only; puzzle drills have none) */
   playedMoveSan?: string;
@@ -66,9 +72,12 @@ export interface GoalFacts {
  */
 export interface PuzzleCandidate {
   externalId: string;
+  /** Position the solver faces — already AFTER the opponent's setup move. */
   fen: string;
-  /** first move of the puzzle's solution line (UCI) */
+  /** first move of the solver's solution line (UCI) */
   solutionUci: string;
+  /** full solver line (UCI, space-separated, alternating with opponent replies) */
+  solutionLine: string;
   solutionSan?: string;
   rating: number;
 }
