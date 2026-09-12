@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { ImportPanel } from '@/components/ImportPanel';
 import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
@@ -20,8 +21,11 @@ export default function LandingPage({
     <main className="mx-auto max-w-5xl px-6 py-10">
       <PageView event="landing_view" />
 
-      <header className="mb-12">
+      <header className="mb-12 flex items-center justify-between">
         <BrandLogo />
+        <Link href="/login" className="text-sm font-medium text-brand hover:underline">
+          Sign in
+        </Link>
       </header>
 
       <section className="grid items-center gap-12 md:grid-cols-2">

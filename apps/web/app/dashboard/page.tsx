@@ -1,8 +1,8 @@
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { weekStartFor } from '@chess-coach/core';
 import { prisma } from '@/lib/server';
 import { getSessionUserId } from '@/lib/auth';
-import { LoginForm } from '@/components/LoginForm';
 import { DashboardActions } from '@/components/DashboardActions';
 
 export const dynamic = 'force-dynamic';
@@ -11,18 +11,7 @@ export default async function DashboardPage() {
   const userId = getSessionUserId();
 
   if (!userId) {
-    return (
-      <main className="mx-auto max-w-md px-6 py-24">
-        <h1 className="text-2xl font-bold">Sign in</h1>
-        <p className="mt-2 text-neutral-600">
-          Enter the email you signed up with and we&apos;ll send you a sign-in link or a 6-digit
-          code.
-        </p>
-        <div className="mt-6">
-          <LoginForm />
-        </div>
-      </main>
-    );
+    redirect('/login');
   }
 
   const user = await prisma.user.findUnique({
@@ -39,11 +28,7 @@ export default async function DashboardPage() {
   });
 
   if (!user) {
-    return (
-      <main className="mx-auto max-w-md px-6 py-24">
-        <p className="text-neutral-600">Session expired. Please sign in again.</p>
-      </main>
-    );
+    redirect('/login');
   }
 
   const activePlan = user.trainingPlans[0];
