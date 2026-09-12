@@ -75,7 +75,7 @@ export function LoginForm() {
         setSent(false);
         setError(null);
       }}
-      className={`rounded-md px-3 py-1 text-sm font-medium ${
+      className={`flex-1 rounded-md px-3 py-1 text-sm font-medium ${
         mode === m ? 'bg-brand text-white' : 'text-neutral-600 hover:text-neutral-900'
       }`}
     >
