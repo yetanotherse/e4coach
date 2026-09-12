@@ -14,6 +14,7 @@ export type ClientEvent =
   | 'report_viewed'
   | 'report_shared'
   | 'reanalyze_clicked'
+  | 'plan_retry_clicked'
   | 'interest_clicked';
 
 export function track(event: ClientEvent, props?: Record<string, unknown>): void {

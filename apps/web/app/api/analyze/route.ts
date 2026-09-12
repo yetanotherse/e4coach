@@ -35,10 +35,11 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError('No Chess.com username on file — sign up again with it first.', 422);
   }
 
-  // Don't stack duplicate active jobs.
+  // Don't stack duplicate active jobs (plan-regen jobs don't block analysis).
   const active = await prisma.analysisJob.findFirst({
     where: {
       userId: user.id,
+      kind: 'analysis',
       status: { in: ['PENDING', 'FETCHING', 'EVALUATING', 'CLASSIFYING', 'GENERATING'] },
     },
   });

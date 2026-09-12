@@ -41,12 +41,20 @@ model AnalysisJob {
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   source     String // 'lichess' | 'lichess-study' | 'chesscom'
+  // 'analysis' = full game-analysis pipeline (default); 'plan' = lightweight
+  // re-run of Stage 7 only, rebuilding this week's plan from the latest report
+  // (used by the dashboard retry CTA when plan generation failed silently).
+  kind       String    @default("analysis")
   status     JobStatus @default(PENDING)
   stage      String? // fine-grained progress for the UI
   gameCount  Int       @default(0)
   params     Json? // user-chosen selection: { maxGames, perfTypes }
   engineMeta Json? // { kind, version, depth/movetime }
   error      String?
+  // Stage 7 observability: plan generation is best-effort and must never fail
+  // the job, so its outcome is recorded here instead ('created' | 'failed').
+  planStatus String?
+  planError  String?
   // idempotency / resumability: which pipeline stage outputs are persisted
   attempts   Int       @default(0)
   createdAt  DateTime  @default(now())

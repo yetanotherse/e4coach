@@ -4,6 +4,7 @@ import { weekStartFor } from '@chess-coach/core';
 import { prisma } from '@/lib/server';
 import { getSessionUserId } from '@/lib/auth';
 import { DashboardActions } from '@/components/DashboardActions';
+import { PlanRegenerateCard } from '@/components/PlanRegenerateCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,8 @@ export default async function DashboardPage() {
     where: { userId, dueAt: { lte: new Date() } },
   });
   const streak = await prisma.streak.findUnique({ where: { userId } });
-  const checkedInThisWeek = streak?.lastCheckInWeekStart?.getTime() === weekStartFor(new Date()).getTime();
+  const checkedInThisWeek =
+    streak?.lastCheckInWeekStart?.getTime() === weekStartFor(new Date()).getTime();
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
@@ -71,6 +73,8 @@ export default async function DashboardPage() {
           <span className="text-brand">Open →</span>
         </Link>
       )}
+
+      {!activePlan && user.reports.length > 0 && <PlanRegenerateCard />}
 
       <Link
         href="/progress"

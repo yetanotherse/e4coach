@@ -58,6 +58,7 @@ function makeDeps(db: PrismaClient, over: Partial<RunDeps> = {}): RunDeps {
     maxExamples: 10,
     depth: 12,
     movetimeMs: 150,
+    planRetryDelayMs: 0,
     ...over,
   };
 }
@@ -193,18 +194,33 @@ describe('runJob (full pipeline on mocks)', () => {
   it('marks the job FAILED for chesscom without a chess.com username', async () => {
     const { db, state } = fakeDb();
     const ccJob = { id: 'j5', userId: 'u1', source: 'chesscom' };
-    await expect(
-      runJob(ccJob, { ...user, chessComUser: null }, makeDeps(db)),
-    ).rejects.toThrow('user has no chess.com username');
+    await expect(runJob(ccJob, { ...user, chessComUser: null }, makeDeps(db))).rejects.toThrow(
+      'user has no chess.com username',
+    );
     expect(state.jobUpdates[state.jobUpdates.length - 1]!.status).toBe('FAILED');
   });
 
   it('marks the job FAILED for chesscom when the source is not configured', async () => {
     const { db, state } = fakeDb();
     const ccJob = { id: 'j6', userId: 'u1', source: 'chesscom' };
-    await expect(
-      runJob(ccJob, { ...user, chessComUser: 'ccuser' }, makeDeps(db)),
-    ).rejects.toThrow('chess.com game source not configured');
+    await expect(runJob(ccJob, { ...user, chessComUser: 'ccuser' }, makeDeps(db))).rejects.toThrow(
+      'chess.com game source not configured',
+    );
     expect(state.jobUpdates[state.jobUpdates.length - 1]!.status).toBe('FAILED');
+  });
+
+  it('records planStatus=failed on the job when plan generation fails, without failing the job', async () => {
+    // fakeDb has no trainingPlan/drill/planItem — plan generation throws twice
+    // (with planRetryDelayMs: 0) and Stage 7 must degrade, not fail the job.
+    const { db, state } = fakeDb();
+    const analytics = new MockAnalytics();
+    const slug = await runJob(job, user, makeDeps(db, { analytics }));
+
+    expect(slug).toBeTruthy(); // report unaffected
+    expect(state.jobUpdates.find((u) => u.status === 'DONE')).toBeDefined();
+    const planFailed = state.jobUpdates.find((u) => u.planStatus === 'failed');
+    expect(planFailed).toBeDefined();
+    expect(planFailed!.planError).toBeTruthy();
+    expect(analytics.events.some((e) => e.event === 'plan_generation_failed')).toBe(true);
   });
 });

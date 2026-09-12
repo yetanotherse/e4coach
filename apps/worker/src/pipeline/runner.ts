@@ -9,6 +9,7 @@ import {
   aggregateProfile,
   parseGame,
   scoreUserMoves,
+  weekStartFor,
   type AnalysisScope,
   type Analytics,
   type ChessEngine,
@@ -59,6 +60,8 @@ export interface RunDeps {
    * works. Omitted when disabled; a failure never affects the plan or job.
    */
   drillExplain?: DrillExplainOptions;
+  /** Delay before the single plan-generation retry (tests pass 0). */
+  planRetryDelayMs?: number;
 }
 
 /** Per-job selection controls chosen by the user (spec feedback #6). */
@@ -71,6 +74,8 @@ export interface JobRecord {
   id: string;
   userId: string;
   source: string;
+  /** 'analysis' (default) or 'plan' — a lightweight Stage-7-only re-run. */
+  kind?: string;
   params?: JobParams | null;
 }
 
@@ -241,22 +246,11 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
 
     // ── Stage 7: this week's training plan (optional upgrade) ──────
     // Built from the same profile; failure here must not fail the job (the
-    // report is already persisted). The plan page reads it via the report.
-    try {
-      await generateTrainingPlan(
-        db,
-        { userId: user.id, profile, reportId: report.id },
-        deps.llm,
-        new Date(),
-        deps.engine,
-        deps.drillExplain,
-      );
-    } catch (err) {
-      console.warn(
-        `[runner] job ${job.id} plan generation failed (report unaffected):`,
-        err instanceof Error ? err.message : err,
-      );
-    }
+    // report is already persisted). Transient failures (DB pooler blips, LLM
+    // outages) used to vanish into a console.warn, leaving users with a report
+    // but no plan — retry once, then record the outcome on the job so the
+    // dashboard can offer a one-click retry.
+    await generatePlanStage(db, job.id, distinctId, user.id, profile, report.id, deps);
 
     // Notify the user their report is ready. Email failure must not fail the job.
     try {
@@ -286,6 +280,179 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
  * deterministic `note` and the job proceeds. A failure here must never cost the
  * user their report.
  */
+/** Delay before the single Stage-7 retry (transient pooler/LLM blips). */
+const PLAN_RETRY_DELAY_MS = 2000;
+
+interface PlanStageOutcome {
+  /** Created plan id, null when skipped ("no drillable weaknesses"), undefined when failed. */
+  planId?: string | null;
+  error?: string;
+}
+
+/**
+ * Stage 7, shared by full analysis jobs (runJob) and lightweight plan-regen
+ * jobs (runPlanJob). Runs generateTrainingPlan with one retry, then persists
+ * the outcome (planStatus/planError) and surfaces failures via analytics and
+ * Sentry — the plan is best-effort, but its failure must not be invisible.
+ */
+async function generatePlanStage(
+  db: PrismaClient,
+  jobId: string,
+  distinctId: string,
+  userId: string,
+  profile: WeaknessProfile,
+  reportId: string,
+  deps: RunDeps,
+): Promise<PlanStageOutcome> {
+  let planId: string | null = null;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      planId = await generateTrainingPlan(
+        db,
+        { userId, profile, reportId },
+        deps.llm,
+        new Date(),
+        deps.engine,
+        deps.drillExplain,
+      );
+      lastErr = undefined;
+      break;
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 1) {
+        const delayMs = deps.planRetryDelayMs ?? PLAN_RETRY_DELAY_MS;
+        console.warn(
+          `[runner] job ${jobId} plan generation failed (attempt 1), retrying in ${delayMs}ms:`,
+          err instanceof Error ? err.message : err,
+        );
+        if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  if (planId) {
+    await db.analysisJob
+      .update({ where: { id: jobId }, data: { planStatus: 'created', planError: null } })
+      .catch(() => {});
+    console.log(`[runner] job ${jobId} plan ${planId} created`);
+    return { planId };
+  }
+  if (!lastErr) {
+    // "No drillable weaknesses" — plan.ts already logged why; nothing to retry.
+    return { planId: null };
+  }
+
+  const message = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  console.warn(
+    `[runner] job ${jobId} plan generation failed after retry (report unaffected):`,
+    message,
+  );
+  await db.analysisJob
+    .update({ where: { id: jobId }, data: { planStatus: 'failed', planError: message } })
+    .catch(() => {});
+  await deps.analytics
+    .capture(distinctId, 'plan_generation_failed', { jobId, error: message })
+    .catch(() => {});
+  await captureException(lastErr, { jobId, userId, stage: 'plan' });
+  return { error: message };
+}
+
+/** Forward an unexpected-but-non-fatal error to Sentry, if configured. */
+async function captureException(err: unknown, context: Record<string, unknown>): Promise<void> {
+  if (!process.env.SENTRY_DSN) return;
+  try {
+    const Sentry = await import('@sentry/node');
+    if (!Sentry.getClient()) return;
+    Sentry.captureException(err, { extra: context });
+  } catch {
+    // Telemetry must never affect the pipeline.
+  }
+}
+
+/**
+ * Lightweight job kind ('plan'): rebuild this week's training plan from the
+ * user's latest report — the dashboard retry CTA for jobs whose Stage 7
+ * failed. No game analysis; the stored profile is the source of truth.
+ */
+export async function runPlanJob(job: JobRecord, user: UserRecord, deps: RunDeps): Promise<void> {
+  const db = deps.db ?? prisma;
+  const distinctId = user.emailHash ?? user.id;
+  // Plan regen runs DB ops + an LLM call + (optionally) a MultiPV engine pass
+  // with no per-item heartbeat; bump updatedAt periodically so stale-job
+  // recovery can't requeue a live job mid-run.
+  const heartbeat = setInterval(() => {
+    void db.analysisJob
+      .update({ where: { id: job.id }, data: { updatedAt: new Date() } })
+      .catch(() => {});
+  }, 60_000);
+  try {
+    const report = await db.report.findFirst({
+      where: { userId: job.userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!report) throw new Error('no report to build a plan from');
+    const profile = report.profile as unknown as WeaknessProfile;
+
+    await db.analysisJob.update({
+      where: { id: job.id },
+      data: { status: 'CLASSIFYING', stage: 'assembling your training plan' },
+    });
+
+    // Idempotency guard: if this week's plan already exists from this report
+    // (e.g. the job was requeued after a partial run), succeed without work.
+    const weekStart = weekStartFor(new Date());
+    const existing = await db.trainingPlan.findFirst({
+      where: { userId: job.userId, weekStart, status: 'active', sourceReportId: report.id },
+      select: { id: true },
+    });
+    if (existing) {
+      console.log(`[runner] plan job ${job.id}: plan ${existing.id} already active — skipping`);
+      await db.analysisJob.update({
+        where: { id: job.id },
+        data: { status: 'DONE', stage: 'done', planStatus: 'created' },
+      });
+      return;
+    }
+
+    const outcome = await generatePlanStage(
+      db,
+      job.id,
+      distinctId,
+      job.userId,
+      profile,
+      report.id,
+      deps,
+    );
+    if (outcome.error) {
+      // Stage-7 outcome is already recorded (planStatus/planError + analytics);
+      // mark the plan job itself failed so attempt counting works.
+      throw new Error(outcome.error);
+    }
+
+    await db.analysisJob.update({
+      where: { id: job.id },
+      data: { status: 'DONE', stage: 'done', planStatus: outcome.planId ? 'created' : null },
+    });
+    console.log(`[runner] plan job ${job.id} DONE`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await db.analysisJob
+      .update({
+        where: { id: job.id },
+        data: { status: 'FAILED', error: message, planStatus: 'failed', planError: message },
+      })
+      .catch(() => {});
+    await deps.analytics
+      .capture(distinctId, 'plan_job_failed', { jobId: job.id, error: message })
+      .catch(() => {});
+    await captureException(err, { jobId: job.id, userId: job.userId, stage: 'plan-regen' });
+    throw err;
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+
 async function explainMistakes(
   db: PrismaClient,
   jobId: string,

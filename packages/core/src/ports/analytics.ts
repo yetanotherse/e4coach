@@ -21,7 +21,11 @@ export type AnalyticsEvent =
   | 'drill_solved'
   | 'review_completed'
   | 'checkin_done'
-  | 'streak_extended';
+  | 'streak_extended'
+  // Training-plan reliability (Stage 7 is best-effort; failures must be visible)
+  | 'plan_generation_failed'
+  | 'plan_job_failed'
+  | 'plan_regen_requested';
 
 export interface Analytics {
   readonly name: string;

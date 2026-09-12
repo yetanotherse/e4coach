@@ -4,7 +4,7 @@
  * §6 — a jobs table + poll loop is enough at MVP volume.
  */
 import { prisma, type JobStatus, type PrismaClient } from '@chess-coach/db';
-import { runJob, type RunDeps } from './runner.js';
+import { runJob, runPlanJob, type RunDeps } from './runner.js';
 import { sendWeeklyNudges, type NudgeDeps, type NudgeOptions } from './nudge.js';
 
 /** Non-terminal statuses a running job passes through (see runner setStage). */
@@ -76,25 +76,36 @@ export async function processNextJob(deps: RunDeps): Promise<boolean> {
   });
   if (claim.count === 0) return false; // lost the race to another worker
 
-  console.log(`[poller] claimed job ${job.id} (source=${job.source})`);
+  console.log(`[poller] claimed job ${job.id} (source=${job.source}, kind=${job.kind})`);
   const user = await db.user.findUniqueOrThrow({ where: { id: job.userId } });
+  const record = {
+    id: user.id,
+    email: user.email,
+    emailHash: user.emailHash,
+    lichessUser: user.lichessUser,
+    chessComUser: user.chessComUser,
+  };
   try {
-    await runJob(
-      {
-        id: job.id,
-        userId: job.userId,
-        source: job.source,
-        params: job.params as { maxGames?: number; perfTypes?: string[] } | null,
-      },
-      {
-        id: user.id,
-        email: user.email,
-        emailHash: user.emailHash,
-        lichessUser: user.lichessUser,
-        chessComUser: user.chessComUser,
-      },
-      deps,
-    );
+    if (job.kind === 'plan') {
+      // Lightweight re-run of Stage 7 only (dashboard retry CTA): rebuild the
+      // week's plan from the latest report — no game analysis.
+      await runPlanJob(
+        { id: job.id, userId: job.userId, source: job.source, kind: 'plan' },
+        record,
+        deps,
+      );
+    } else {
+      await runJob(
+        {
+          id: job.id,
+          userId: job.userId,
+          source: job.source,
+          params: job.params as { maxGames?: number; perfTypes?: string[] } | null,
+        },
+        record,
+        deps,
+      );
+    }
   } catch (err) {
     // runJob already recorded FAILED; swallow so the loop continues.
     console.error(`[poller] job ${job.id} failed:`, err instanceof Error ? err.message : err);
