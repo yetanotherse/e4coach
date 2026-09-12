@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
 import { DrillBoard } from './DrillBoard';
 
@@ -54,11 +54,10 @@ export function DrillSolver({
     startedAt.current = Date.now();
   }, [drill.id]);
 
-  const timeSpentMs = useMemo(() => Date.now() - startedAt.current, [phase]);
-
   async function record(solved: boolean, playedUci?: string) {
     setSaving(true);
     try {
+      const timeSpentMs = Date.now() - startedAt.current;
       await fetch(`/api/drills/${drill.id}/attempt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
