@@ -30,6 +30,17 @@ export default async function DrillPage({
   const row = await prisma.drill.findUnique({ where: { id: params.id } });
   if (!row || row.userId !== userId) notFound();
 
+  // For puzzle drills, the opponent's setup move (Puzzle.line[0]) produced the
+  // drill position — highlighted at start for context. Derived at read time
+  // from the source puzzle, no duplication on the Drill row.
+  const puzzle =
+    row.type === 'puzzle' && row.puzzleId
+      ? await prisma.puzzle.findUnique({
+          where: { externalId: row.puzzleId },
+          select: { line: true },
+        })
+      : null;
+
   const meta = CATEGORY_META[row.theme as keyof typeof CATEGORY_META];
   const drill: DrillData = {
     id: row.id,
@@ -39,6 +50,7 @@ export default async function DrillPage({
     fen: row.fen,
     sideToMove: row.sideToMove === 'black' ? 'black' : 'white',
     solutionUci: row.solutionUci,
+    setupMoveUci: puzzle?.line.trim().split(/\s+/)[0] ?? null,
     solutionLine: row.solutionLine,
     solutionSan: row.solutionSan,
     playedMoveSan: row.playedMoveSan,

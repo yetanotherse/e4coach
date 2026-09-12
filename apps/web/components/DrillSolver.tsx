@@ -13,6 +13,12 @@ export interface DrillData {
   sideToMove: 'white' | 'black';
   solutionUci: string;
   /**
+   * The opponent's setup move (UCI) that produced `fen` — puzzle drills only,
+   * derived from the source Puzzle row. Highlighted at drill start for
+   * context, Lichess-style.
+   */
+  setupMoveUci?: string | null;
+  /**
    * Full multi-move solution line (UCI, space-separated): the solver's moves
    * alternating with the opponent's replies. Own-game drills are single-move
    * and leave this unset.
@@ -71,6 +77,11 @@ export function DrillSolver({
   const [fen, setFen] = useState(drill.fen);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false); // opponent reply pending
+  // Most recent move on the board (Lichess last-move highlight): the
+  // opponent's setup move at start, then alternates user move / reply.
+  const [lastMoveUci, setLastMoveUci] = useState<string | undefined>(
+    drill.setupMoveUci ?? undefined,
+  );
   const [tries, setTries] = useState(0);
   const [hinted, setHinted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -86,6 +97,7 @@ export function DrillSolver({
     setFen(drill.fen);
     setStep(0);
     setBusy(false);
+    setLastMoveUci(drill.setupMoveUci ?? undefined);
     setTries(0);
     setHinted(false);
     setResets(0);
@@ -169,6 +181,7 @@ export function DrillSolver({
     }
 
     const afterUserFen = probe.fen();
+    setLastMoveUci(playedUci);
     if (step === line.length - 1) {
       // Final move of the line — puzzle complete.
       setFen(afterUserFen);
@@ -186,7 +199,10 @@ export function DrillSolver({
       const reply = new Chess(afterUserFen);
       const opponentMove = applyUci(reply, opponentUci);
       const next = step + 2;
-      if (opponentMove) setFen(reply.fen());
+      if (opponentMove) {
+        setFen(reply.fen());
+        setLastMoveUci(opponentUci);
+      }
       setBusy(false);
       if (next >= line.length) {
         // The line ends with the opponent's reply (e.g. defensive puzzles).
@@ -234,6 +250,7 @@ export function DrillSolver({
         fen={fen}
         orientation={drill.sideToMove}
         solutionUcis={hintUcis}
+        lastMoveUci={lastMoveUci}
         flashUci={flashUci}
         locked={busy || solved}
         resetSignal={resets}

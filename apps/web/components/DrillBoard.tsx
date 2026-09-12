@@ -34,6 +34,7 @@ export function DrillBoard({
   fen,
   orientation,
   solutionUcis,
+  lastMoveUci,
   flashUci,
   locked,
   resetSignal,
@@ -43,6 +44,8 @@ export function DrillBoard({
   orientation: 'white' | 'black';
   /** shown as green arrow(s) once solved / hinted */
   solutionUcis?: string[];
+  /** most recent move (UCI), shown as the standard yellow last-move highlight */
+  lastMoveUci?: string | null;
   /** wrong move, briefly shown as a red arrow while the piece snaps back */
   flashUci?: string;
   /** true while the opponent's reply is animating or the drill is solved */
@@ -75,6 +78,11 @@ export function DrillBoard({
       fen: fen.split(' ')[0],
       orientation,
       turnColor: orientation,
+      // Standard yellow last-move highlight (Lichess-style context marker).
+      lastMove:
+        lastMoveUci && lastMoveUci.length >= 4
+          ? [lastMoveUci.slice(0, 2) as Key, lastMoveUci.slice(2, 4) as Key]
+          : [],
       movable: {
         free: false,
         // Locked: no side may move (opponent reply pending, or solved).
@@ -97,7 +105,7 @@ export function DrillBoard({
       }
     }
     api.setAutoShapes(shapes);
-  }, [fen, orientation, solutionUcis, flashUci, locked, resetSignal]);
+  }, [fen, orientation, solutionUcis, lastMoveUci, flashUci, locked, resetSignal]);
 
   return <div ref={ref} className="aspect-square w-full" />;
 }
