@@ -25,6 +25,12 @@ function destsFor(fen: string): Map<Key, Key[]> {
   return dests;
 }
 
+/** Color whose king is in check on `fen` (the side to move), or false. */
+function checkColorOf(fen: string): 'white' | 'black' | false {
+  const chess = new Chess(fen);
+  return chess.inCheck() ? (chess.turn() === 'w' ? 'white' : 'black') : false;
+}
+
 /**
  * Interactive drill board: the user plays the side they had in the game.
  * Emits (from, to) pairs; position/feedback state stays in the solver so the
@@ -79,7 +85,10 @@ export function DrillBoard({
       orientation,
       turnColor: orientation,
       // Red glow on the checked king (styled in globals.css), like Lichess.
-      check: new Chess(fen).inCheck(),
+      // Explicit color: chessground's `check: true` highlights the king of
+      // turnColor (pinned to the solver here), not whoever is actually in
+      // check — e.g. after the solver's mating move, the mated opponent.
+      check: checkColorOf(fen),
       // Standard yellow last-move highlight (Lichess-style context marker).
       lastMove:
         lastMoveUci && lastMoveUci.length >= 4
