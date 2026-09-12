@@ -8,7 +8,7 @@ import { snapshotRatings } from '@/lib/ratingSnapshots';
 const AttemptSchema = z.object({
   solved: z.boolean(),
   playedUci: z.string().min(4).max(5).optional(),
-  timeSpentMs: z.coerce.number().int().positive().max(3_600_000).optional(),
+  timeSpentMs: z.coerce.number().int().min(0).max(3_600_000).optional(),
 });
 
 /**
