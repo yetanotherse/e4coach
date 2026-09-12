@@ -78,6 +78,8 @@ export function DrillBoard({
       fen: fen.split(' ')[0],
       orientation,
       turnColor: orientation,
+      // Red glow on the checked king (styled in globals.css), like Lichess.
+      check: new Chess(fen).inCheck(),
       // Standard yellow last-move highlight (Lichess-style context marker).
       lastMove:
         lastMoveUci && lastMoveUci.length >= 4

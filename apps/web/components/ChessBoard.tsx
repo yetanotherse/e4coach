@@ -5,6 +5,7 @@ import { Chessground } from 'chessground';
 import type { Api } from 'chessground/api';
 import type { Key } from 'chessground/types';
 import type { DrawShape } from 'chessground/draw';
+import { Chess } from 'chess.js';
 
 /** On-brand arrows: better move = success green, played move = danger red. */
 const BRUSHES = {
@@ -61,7 +62,12 @@ export function ChessBoard({
     if (!api) return;
     // Orientation must be set explicitly here — without it, a board for a black
     // player would silently keep the mount-time default and render flipped.
-    api.set({ fen: fen.split(' ')[0], orientation });
+    // check: red glow on the checked king (styled in globals.css).
+    api.set({
+      fen: fen.split(' ')[0],
+      orientation,
+      check: new Chess(fen).inCheck(),
+    });
     api.setAutoShapes([...arrow(playedUci, 'red'), ...arrow(betterUci, 'green')]);
   }, [fen, orientation, playedUci, betterUci]);
 

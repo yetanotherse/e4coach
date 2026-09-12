@@ -30,7 +30,9 @@
   /* branded chess board */
   --board-light: #ecedfb; /* mist */
   --board-dark: #949be6; /* indigo-300 */
-  --board-move: rgba(79, 91, 213, 0.28); /* last-move highlight (primary) */
+  --board-move: rgba(79, 91, 213, 0.28); /* selected-square highlight (primary) */
+  /* last-move highlight — amber at high contrast against both square colors */
+  --board-last-move: rgba(217, 119, 6, 0.45);
 
   color-scheme: light;
 }
@@ -79,10 +81,39 @@ h3 {
   background-size: 25% 25%;
 }
 .cg-wrap cg-board square.last-move {
-  background: var(--board-move);
+  background: var(--board-last-move);
 }
 .cg-wrap cg-board square.selected {
   background: var(--board-move);
+}
+/* Checked king — red radial glow (chessground's brown-theme styling; the
+   .check class is only applied when the board is told check is present). */
+.cg-wrap cg-board square.check {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 0, 0, 1) 0%,
+    rgba(231, 0, 0, 1) 25%,
+    rgba(169, 0, 0, 0) 89%,
+    rgba(158, 0, 0, 0) 100%
+  );
+}
+
+/* Legal-move dots (chessground only colors these in its theme css, which we
+   don't import) — dark neutral dots readable on both square shades. */
+.cg-wrap cg-board square.move-dest {
+  background: radial-gradient(rgba(23, 23, 32, 0.22) 22%, transparent 24%);
+  pointer-events: auto;
+}
+.cg-wrap cg-board square.move-dest:hover {
+  background: radial-gradient(rgba(23, 23, 32, 0.35) 22%, transparent 24%);
+}
+.cg-wrap cg-board square.oc.move-dest {
+  background: radial-gradient(
+    transparent 0%,
+    transparent 78%,
+    rgba(23, 23, 32, 0.3) 80%,
+    transparent 82%
+  );
 }
 
 /* Coordinates inside the board corners (Chessground's default offsets assume a
