@@ -7,6 +7,7 @@ export { LichessRatingSource, type LichessRatingOptions } from './rating/lichess
 export { ChessComRatingSource, type ChessComRatingOptions } from './rating/chessComRatingSource.js';
 export { StockfishNativeEngine, type StockfishNativeOptions } from './stockfish/nativeEngine.js';
 export { GeminiFlashProvider, type GeminiOptions } from './llm/geminiProvider.js';
+export { DeepSeekProvider, type DeepSeekOptions } from './llm/deepseekProvider.js';
 export { PostHogAnalytics, type PostHogOptions } from './analytics/posthogAnalytics.js';
 export { ResendMailer, type ResendOptions } from './email/resendMailer.js';
 

@@ -28,9 +28,13 @@ const EnvSchema = z.object({
   AUTH_SECRET: z.string().min(1).default('dev-secret-change-me'),
 
   // LLM
-  LLM_PROVIDER: z.enum(['mock', 'gemini']).default('mock'),
+  LLM_PROVIDER: z.enum(['mock', 'gemini', 'deepseek']).default('mock'),
   LLM_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_API_KEY: z.string().optional(),
+  DEEPSEEK_API_KEY: z.string().optional(),
+  // DeepSeek V4 thinking mode — off by default: these are short deterministic
+  // coach-narration calls at temperature 0; thinking adds latency + cost.
+  DEEPSEEK_THINKING: boolish.default('false'),
 
   // Engine
   ENGINE_KIND: z.enum(['mock', 'native', 'wasm']).default('mock'),
@@ -157,6 +161,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
 function assertProviderCreds(e: Env): void {
   const missing: string[] = [];
   if (e.LLM_PROVIDER === 'gemini' && !e.GEMINI_API_KEY) missing.push('GEMINI_API_KEY');
+  if (e.LLM_PROVIDER === 'deepseek' && !e.DEEPSEEK_API_KEY) missing.push('DEEPSEEK_API_KEY');
   if (e.ENGINE_KIND === 'native' && !e.STOCKFISH_PATH) missing.push('STOCKFISH_PATH');
   if (e.ANALYTICS_PROVIDER === 'posthog' && !e.POSTHOG_KEY) missing.push('POSTHOG_KEY');
   if (e.MAILER_PROVIDER === 'resend' && !e.RESEND_API_KEY) missing.push('RESEND_API_KEY');

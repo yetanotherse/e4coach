@@ -21,6 +21,7 @@ import { LichessRatingSource } from './rating/lichessRatingSource.js';
 import { ChessComRatingSource } from './rating/chessComRatingSource.js';
 import { StockfishNativeEngine } from './stockfish/nativeEngine.js';
 import { GeminiFlashProvider } from './llm/geminiProvider.js';
+import { DeepSeekProvider } from './llm/deepseekProvider.js';
 import type { ResilienceOptions } from './llm/resilience.js';
 import { PostHogAnalytics } from './analytics/posthogAnalytics.js';
 import { ResendMailer } from './email/resendMailer.js';
@@ -98,6 +99,14 @@ export function createLlmProvider(env: Env, hooks: LlmHooks = {}): LlmProvider {
       return new GeminiFlashProvider({
         apiKey: env.GEMINI_API_KEY,
         model: env.LLM_MODEL,
+        ...(hooks.onUsage ? { onUsage: hooks.onUsage } : {}),
+      });
+    case 'deepseek':
+      if (!env.DEEPSEEK_API_KEY) throw new Error('DEEPSEEK_API_KEY is required for deepseek provider');
+      return new DeepSeekProvider({
+        apiKey: env.DEEPSEEK_API_KEY,
+        model: env.LLM_MODEL,
+        thinking: env.DEEPSEEK_THINKING,
         ...(hooks.onUsage ? { onUsage: hooks.onUsage } : {}),
       });
   }

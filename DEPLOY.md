@@ -15,7 +15,9 @@ Everything is behind adapters selected by env, so flip a provider by changing on
 ## 0. Provision external services
 
 - **Supabase** project → copy the pooled `DATABASE_URL` and the direct `DIRECT_URL`.
-- **Google AI Studio** → `GEMINI_API_KEY`.
+- **LLM key** — pick one provider:
+  - **Gemini** (default) → [Google AI Studio](https://aistudio.google.com/) → `GEMINI_API_KEY`.
+  - **DeepSeek** (cheaper per token) → [platform.deepseek.com](https://platform.deepseek.com/api_keys) → `DEEPSEEK_API_KEY`.
 - **Resend** → `RESEND_API_KEY` + verify your sending domain → set `EMAIL_FROM`.
 - **PostHog** (cloud) → `POSTHOG_KEY` + `POSTHOG_HOST`.
 - Pick a descriptive `LICHESS_USER_AGENT` (e.g. `ChessCoach/1.0 (you@example.com)`).
@@ -119,6 +121,10 @@ STOCKFISH_PATH=/usr/local/bin/stockfish
 LLM_PROVIDER=gemini
 LLM_MODEL=gemini-2.5-flash
 GEMINI_API_KEY=...
+# --- or DeepSeek instead of Gemini (swap the three lines above for these) ---
+# LLM_PROVIDER=deepseek
+# LLM_MODEL=deepseek-v4-flash
+# DEEPSEEK_API_KEY=sk-...
 ANALYTICS_PROVIDER=posthog
 POSTHOG_KEY=...
 POSTHOG_HOST=https://us.i.posthog.com
@@ -248,7 +254,32 @@ docker compose pull; docker compose up -d --build   # redeploy
 > link, and a missing value falls back to `http://localhost:3000`. The worker
 > logs its `appUrl` at boot and warns if it's still localhost in production.
 
-## 4. Smoke-check production
+## 4. Switching the LLM provider (Gemini ↔ DeepSeek)
+
+The worker is the only component that calls the LLM, and the provider is chosen purely by env
+(`createLlmProvider` in `packages/adapters/src/factory.ts`). To switch, change three variables in
+the worker's environment and restart it — **no code changes, no rebuilds, no web-tier changes**:
+
+| Variable | Gemini | DeepSeek |
+|---|---|---|
+| `LLM_PROVIDER` | `gemini` | `deepseek` |
+| `LLM_MODEL` | `gemini-2.5-flash` *(2.0-flash is shut down)* | `deepseek-v4-flash` |
+| API key | `GEMINI_API_KEY=...` | `DEEPSEEK_API_KEY=sk-...` |
+
+Optionally `DEEPSEEK_THINKING=true` enables DeepSeek V4's thinking mode (default `false` — these
+are short deterministic coach-narration calls; thinking adds latency and cost).
+
+- **Local:** edit `.env`, restart `pnpm worker:dev`.
+- **Render:** update `LLM_PROVIDER` / `LLM_MODEL` / the key env var in the dashboard and redeploy.
+- **Docker (own server):** edit `/opt/e4coach/worker.env`, then `docker compose up -d` (or
+  `docker stop && docker rm && docker run` — a plain `docker restart` reuses the old env; see §3b).
+- `LLM_PROVIDER=mock` (the default) never calls a real LLM — it returns schema-shaped JSON offline.
+
+Failures degrade safely: every LLM stage Zod-validates the output and falls back to a
+deterministic template, so a missing key or a provider outage lowers report richness instead of
+failing the job. Costs are logged per call via the `[llm] {model} {in} in / {out} out` line.
+
+## 5. Smoke-check production
 
 - Sign up on the landing page with a real Lichess username.
 - Watch the worker logs step through `FETCHING → EVALUATING → CLASSIFYING → GENERATING → DONE`.

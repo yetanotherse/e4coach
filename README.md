@@ -45,7 +45,7 @@ apps/
   worker/   Node — job poller + staged analysis pipeline (native Stockfish)
 packages/
   core/     Domain: types, weakness taxonomy, detectors, aggregation, prompts, adapter PORTS
-  adapters/ Vendor adapters (Lichess/Stockfish/Gemini/PostHog/Resend) + Mock*
+  adapters/ Vendor adapters (Lichess/Stockfish/Gemini/DeepSeek/PostHog/Resend) + Mock*
   db/       Prisma schema + client (Postgres/Supabase)
   config/   Zod-validated typed env + provider selection
 e2e/        Playwright funnel test
@@ -76,10 +76,31 @@ pnpm worker:dev               # job poll loop
 Sign up with username `mockuser` (canned games), or `unknownuser` / `nogamesuser` to exercise
 the error paths.
 
-**Run with real analysis** (Lichess + native Stockfish + Gemini): set in `.env`
-`GAME_SOURCE=lichess`, `ENGINE_KIND=native`, `STOCKFISH_PATH=...`, `LLM_PROVIDER=gemini`,
-`LLM_MODEL=gemini-2.5-flash` (note: `gemini-2.0-flash` is **shut down** and 404s), plus
-`GEMINI_API_KEY`. Analytics/email similarly switch to `posthog` / `resend`.
+**Run with real analysis** (Lichess + native Stockfish + a real LLM): set in `.env`
+`GAME_SOURCE=lichess`, `ENGINE_KIND=native`, `STOCKFISH_PATH=...`, plus the LLM provider vars
+below. Analytics/email similarly switch to `posthog` / `resend`.
+
+### LLM provider (Gemini or DeepSeek)
+
+The LLM is selected by env — no code changes are needed to switch:
+
+```bash
+# Gemini (default for production)
+LLM_PROVIDER="gemini"
+LLM_MODEL="gemini-2.5-flash"      # gemini-2.0-flash is shut down (404s)
+GEMINI_API_KEY="..."
+
+# DeepSeek (OpenAI-compatible; significantly cheaper per token)
+LLM_PROVIDER="deepseek"
+LLM_MODEL="deepseek-v4-flash"
+DEEPSEEK_API_KEY="sk-..."
+DEEPSEEK_THINKING="false"         # V4 thinking mode — off by default (adds latency + cost)
+```
+
+Switching is just env vars: change `LLM_PROVIDER` + `LLM_MODEL` + the matching key and restart
+the worker. Only the worker calls the LLM (report prose, mistake/drill explanations, plan goals);
+all output is Zod-validated and grounded against engine facts with a template fallback, so a
+provider failure degrades gracefully rather than failing the job.
 
 > **Supabase note:** the direct `db.<ref>.supabase.co` host is IPv6-only. Use the **pooler**
 > for both URLs — transaction pooler (`:6543`, `pgbouncer=true`) for `DATABASE_URL`, session
