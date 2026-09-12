@@ -23,7 +23,10 @@ export default function LandingPage({
 
       <header className="mb-12 flex items-center justify-between">
         <BrandLogo />
-        <Link href="/login" className="text-sm font-medium text-brand hover:underline">
+        <Link
+          href="/login"
+          className="rounded-lg bg-brand px-4 py-2 font-semibold text-white transition hover:bg-brand-dark"
+        >
           Sign in
         </Link>
       </header>
