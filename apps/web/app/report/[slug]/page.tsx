@@ -5,7 +5,7 @@ import { MoveExample } from '@/components/MoveExample';
 import { BrandLogo } from '@/components/BrandLogo';
 import { ShareBar } from '@/components/ShareBar';
 import { PrintButton } from '@/components/PrintButton';
-import { FakeDoor } from '@/components/FakeDoor';
+import { ReportNextSteps } from '@/components/ReportNextSteps';
 import { PageView } from '@/components/PageView';
 
 /** e.g. "Rapid" for one type, "Mixed: blitz, rapid" for several. */
@@ -222,7 +222,7 @@ export default async function ReportPage({ params }: { params: { slug: string } 
       )}
 
       <section className="mt-16 print:hidden">
-        <FakeDoor reportSlug={params.slug} />
+        <ReportNextSteps />
       </section>
     </main>
   );
