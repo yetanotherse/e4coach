@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Sora, DM_Sans } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 
 const display = Sora({ subsets: ['latin'], weight: ['600', '700'], variable: '--font-display' });
@@ -15,7 +17,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
