@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import { ImportPanel } from '@/components/ImportPanel';
-import { FakeDoor } from '@/components/FakeDoor';
 import { PageView } from '@/components/PageView';
 import { BrandLogo } from '@/components/BrandLogo';
 import { CoreIdea } from '@/components/CoreIdea';
 import { PositionInsight } from '@/components/PositionInsight';
+import { CoachingFeatures } from '@/components/CoachingFeatures';
+import { GetStarted } from '@/components/GetStarted';
 
 const STEPS = [
-  { title: 'We import your games', body: 'Your recent public Lichess games — no password, no OAuth.' },
+  { title: 'We import your games', body: 'Your recent public Lichess or Chess.com games, studies, or PGN files — no password, no OAuth.' },
   { title: 'We find your patterns', body: 'A chess engine reviews every move to pinpoint what costs you rating.' },
   { title: 'You get a clear plan', body: 'Your top 3 weaknesses, in plain language, with your own positions.' },
 ];
@@ -31,13 +32,14 @@ export default function LandingPage({
         </Link>
       </header>
 
-      <section className="grid items-center gap-12 md:grid-cols-2">
+      <section id="import" className="grid items-center gap-12 md:grid-cols-2">
         <div>
           <h1 className="text-4xl font-bold leading-tight md:text-5xl">
             Find the weaknesses costing you rating.
           </h1>
           <p className="mt-4 text-lg text-neutral-600">
-            A personal chess coach that turns your own games into a clear, honest report — free.
+            A personal chess coach that turns your own games into a clear, honest report — and a
+            weekly plan to fix them. Free to start.
           </p>
           <ul className="mt-6 space-y-2 text-neutral-700">
             {STEPS.map((s) => (
@@ -69,7 +71,11 @@ export default function LandingPage({
       </section>
 
       <section className="mt-16">
-        <FakeDoor />
+        <CoachingFeatures />
+      </section>
+
+      <section className="mt-16">
+        <GetStarted />
       </section>
     </main>
   );

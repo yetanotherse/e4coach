@@ -11,12 +11,12 @@ const body = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600'], variab
 export const metadata: Metadata = {
   title: 'e4coach — your free personal chess weakness report',
   description:
-    'Turn your own Lichess games and studies into a clear, personal report of the weaknesses costing you rating.',
+    'Turn your Lichess or Chess.com games into a clear, personal report of the weaknesses costing you rating — plus a weekly training plan, drills, and spaced repetition to fix them.',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`scroll-smooth ${display.variable} ${body.variable}`}>
       <body>
         {children}
         <Analytics />
