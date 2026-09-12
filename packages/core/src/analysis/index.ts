@@ -5,5 +5,6 @@ export * from './structure.js';
 export * from './positionAggregate.js';
 export * from './renderTemplate.js';
 export * from './explain.js';
+export * from './puzzleExplain.js';
 export * from './studies.js';
 export * from './pgnUpload.js';

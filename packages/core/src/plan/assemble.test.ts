@@ -13,7 +13,7 @@ import {
 const FEN_1 = 'r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5Q2/PPPP1PPP/RNB1K1NR w KQkq - 0 1';
 const FEN_2 = 'r1bqkbnr/ppp2ppp/2np4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1';
 
-function example(_overrides: Partial<ErrorInstance> = {}): ErrorInstance {
+function example(overrides: Partial<ErrorInstance> = {}): ErrorInstance {
   return {
     category: 'HANGING_PIECE',
     gameId: 'g1',
@@ -30,6 +30,7 @@ function example(_overrides: Partial<ErrorInstance> = {}): ErrorInstance {
     assessment: 'balanced (+0.4)',
     userColor: 'white',
     note: 'the queen went off to be captured',
+    ...overrides,
   };
 }
 
@@ -135,10 +136,64 @@ describe('buildPlanDraft', () => {
     expect(drill.note).toContain('queen');
   });
 
+  it('copies deep-pass insight into own-game drills (drill-insight feature)', () => {
+    const explained = profile({
+      topWeaknesses: ['HANGING_PIECE'],
+      categories: [
+        {
+          category: 'HANGING_PIECE',
+          frequency: 6,
+          estimatedRatingLoss: 90,
+          examples: [
+            example({
+              cpBefore: 40,
+              cpAfter: -280,
+              explanation: {
+                whatWentWrong: 'the queen steps into a capture',
+                whyBetter: 'Qd3 keeps the queen guarded',
+                takeaway: 'check what your opponent can take',
+                source: 'llm',
+              },
+              variations: [
+                {
+                  kind: 'refutation',
+                  label: 'You played Qxf7#?',
+                  startFen: FEN_1,
+                  sans: ['Qxf7#'],
+                },
+              ],
+            }),
+          ],
+        },
+      ],
+    });
+    const drill = buildPlanDraft(explained).items[0]!.drills[0]!;
+    expect(drill.explanation?.source).toBe('llm');
+    expect(drill.explanation?.whyBetter).toContain('Qd3');
+    expect(drill.variations).toHaveLength(1);
+    expect(drill.variations?.[0]!.kind).toBe('refutation');
+    expect(drill.cpBefore).toBe(40);
+    expect(drill.cpAfter).toBe(-280);
+  });
+
+  it('leaves insight unset on pre-deep-pass examples (note fallback intact)', () => {
+    const draft = buildPlanDraft(p);
+    const drill = draft.items[0]!.drills[0]!;
+    expect(drill.explanation).toBeUndefined();
+    expect(drill.variations).toBeUndefined();
+    // cpBefore/cpAfter are core ErrorInstance fields (not deep-pass output),
+    // so the eval swing is always available for own-game drills.
+    expect(drill.cpBefore).toBe(40);
+    expect(drill.cpAfter).toBe(-280);
+    expect(drill.note).toContain('queen');
+  });
+
   it('skips themes without examples', () => {
     const empty = profile({
       topWeaknesses: ['TIME_TROUBLE'],
-      categories: [{ category: 'TIME_TROUBLE', frequency: 0, estimatedRatingLoss: 0, examples: [] }],
+      categories: [
+        { category: 'TIME_TROUBLE', frequency: 0, estimatedRatingLoss: 0, examples: [] },
+      ],
     });
     expect(buildPlanDraft(empty).items).toHaveLength(0);
   });
@@ -272,8 +327,12 @@ describe('helpers', () => {
 
   it('sanForUci converts UCI to SAN on a position', () => {
     // Starting position: e2e4 is e4.
-    expect(sanForUci('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'e2e4')).toBe('e4');
-    expect(sanForUci('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'e2e4q')).toBe('e4'); // promotion ignored when N/A
+    expect(sanForUci('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'e2e4')).toBe(
+      'e4',
+    );
+    expect(sanForUci('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 'e2e4q')).toBe(
+      'e4',
+    ); // promotion ignored when N/A
     expect(sanForUci('not a fen', 'e2e4')).toBeUndefined();
   });
 });

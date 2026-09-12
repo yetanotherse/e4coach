@@ -15,6 +15,7 @@ import {
 import { prisma } from '@chess-coach/db';
 import { runPollLoop } from './pipeline/poller.js';
 import { createDbEvalCache } from './pipeline/evalCache.js';
+import { DEFAULT_DRILL_EXPLAIN_LLM_OPTIONS } from './pipeline/drillExplain.js';
 
 /** Host (and db name) of a Postgres URL, with credentials stripped, for logs. */
 function dbTarget(url: string): string {
@@ -66,6 +67,15 @@ async function main(): Promise<void> {
       maxPositions: env.DEEP_ANALYSIS_MAX_POSITIONS,
       maxPvPlies: env.DEEP_ANALYSIS_PV_PLIES,
     },
+    drillExplain: env.DRILL_EXPLAIN_ENABLED
+      ? {
+          depth: env.DEEP_ANALYSIS_DEPTH,
+          multiPv: env.DEEP_ANALYSIS_MULTIPV,
+          maxPvPlies: env.DEEP_ANALYSIS_PV_PLIES,
+          maxDrills: env.DRILL_EXPLAIN_MAX_DRILLS,
+          ...DEFAULT_DRILL_EXPLAIN_LLM_OPTIONS,
+        }
+      : undefined,
   };
 
   console.log('[worker] started', {
@@ -78,6 +88,9 @@ async function main(): Promise<void> {
     llm: deps.llm.name,
     deepAnalysis: env.DEEP_ANALYSIS_ENABLED
       ? `depth ${env.DEEP_ANALYSIS_DEPTH}, multipv ${env.DEEP_ANALYSIS_MULTIPV}, max ${env.DEEP_ANALYSIS_MAX_POSITIONS}`
+      : 'off',
+    drillExplain: env.DRILL_EXPLAIN_ENABLED
+      ? `depth ${env.DEEP_ANALYSIS_DEPTH}, multipv ${env.DEEP_ANALYSIS_MULTIPV}, max ${env.DRILL_EXPLAIN_MAX_DRILLS}`
       : 'off',
     pollMs: env.WORKER_POLL_INTERVAL_MS,
     maxGamesPerJob: env.MAX_GAMES_PER_JOB,

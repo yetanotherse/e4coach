@@ -63,6 +63,14 @@ const EnvSchema = z.object({
   // Plies of each variation kept for the stepper.
   DEEP_ANALYSIS_PV_PLIES: z.coerce.number().int().min(2).max(12).default(6),
 
+  // Drill insight — the same MultiPV + narration pass applied to PUZZLE drills
+  // at plan-generation time (puzzles are never otherwise engine-analyzed), so
+  // the solved-drill view can explain why the solution works. Reuses the deep
+  // analysis depth/multiPv settings; each puzzle costs two evals + a share of
+  // one LLM call. A hard per-plan cap bounds the added runtime.
+  DRILL_EXPLAIN_ENABLED: boolish.default('true'),
+  DRILL_EXPLAIN_MAX_DRILLS: z.coerce.number().int().min(0).max(100).default(12),
+
   // Game source
   GAME_SOURCE: z.enum(['mock', 'lichess', 'chesscom']).default('mock'),
   LICHESS_USER_AGENT: z.string().default('ChessCoachMVP/0.1'),

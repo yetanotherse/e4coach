@@ -2,7 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Chess } from 'chess.js';
+import { assessEval } from '@chess-coach/core';
 import { DrillBoard } from './DrillBoard';
+import { VariationTabs, type VariationData } from './VariationTabs';
+
+/** A single wrong move explanation, same shape as the report's prose. */
+export interface DrillExplanation {
+  whatWentWrong: string;
+  whyBetter: string;
+  takeaway: string;
+  source: 'llm' | 'template';
+}
 
 export interface DrillData {
   id: string;
@@ -28,6 +38,15 @@ export interface DrillData {
   playedMoveSan?: string | null;
   gameId?: string | null;
   note?: string | null;
+  /**
+   * Post-solve insight (persisted at analysis/plan time): coach prose, engine
+   * variations, and the eval swing around the solution. Absent on older
+   * drills — the panel then keeps showing `note` only.
+   */
+  explanation?: DrillExplanation;
+  variations?: VariationData[];
+  cpBefore?: number | null;
+  cpAfter?: number | null;
 }
 
 type Phase = 'solving' | 'wrong' | 'solved';
@@ -137,9 +156,7 @@ export function DrillSolver({
 
   /** A played move matches the expected UCI (promotion piece lenient). */
   function matches(expected: string, played: string): boolean {
-    return expected.length >= 5
-      ? played === expected
-      : played.slice(0, 4) === expected.slice(0, 4);
+    return expected.length >= 5 ? played === expected : played.slice(0, 4) === expected.slice(0, 4);
   }
 
   /** Apply a UCI move to a position; null when illegal (chess.js throws). */
@@ -216,6 +233,12 @@ export function DrillSolver({
 
   const showHint = hinted || tries >= 3;
   const solved = phase === 'solved';
+  // Eval swing around the solution, in the same plain language the report uses
+  // (drill-insight feature). Only shown when both sides of the swing are known.
+  const swing =
+    typeof drill.cpBefore === 'number' && typeof drill.cpAfter === 'number'
+      ? { from: assessEval(drill.cpBefore), to: assessEval(drill.cpAfter) }
+      : null;
   // Hint (and the solved board) highlight the move to find. After solving,
   // highlight the final solver move of the line (the last even index).
   const lastUserIndex = line.length % 2 === 0 ? line.length - 2 : line.length - 1;
@@ -287,8 +310,30 @@ export function DrillSolver({
                 )}
               </p>
             )}
+            {swing && (
+              <p className="mt-2 text-neutral-600">
+                Evaluation: <span className="text-neutral-700">{swing.from}</span> →{' '}
+                <span className="font-medium text-neutral-900">{swing.to}</span>
+              </p>
+            )}
             {drill.note && <p className="mt-2 text-neutral-600">{drill.note}</p>}
           </div>
+          {drill.explanation && (
+            <div className="rounded-lg border border-brand/30 bg-white px-4 py-3 text-sm">
+              <p className="text-neutral-700">{drill.explanation.whatWentWrong}</p>
+              {drill.explanation.whyBetter && (
+                <p className="mt-1.5 text-neutral-700">{drill.explanation.whyBetter}</p>
+              )}
+              <p className="mt-1.5 text-neutral-600">
+                <strong className="font-medium">Takeaway:</strong> {drill.explanation.takeaway}
+              </p>
+            </div>
+          )}
+          {drill.variations && drill.variations.length > 0 && (
+            <div className="rounded-lg border border-neutral-200 bg-white px-4 py-3">
+              <VariationTabs variations={drill.variations} orientation={drill.sideToMove} />
+            </div>
+          )}
           <button
             onClick={() => (window.location.href = backHref)}
             disabled={saving}

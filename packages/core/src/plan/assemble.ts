@@ -16,9 +16,7 @@ export const DEFAULT_PUZZLES_PER_THEME = 2;
 
 /** Monday 00:00 UTC of the week containing `now`. */
 export function weekStartFor(now: Date): Date {
-  const day = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const offset = (day.getUTCDay() + 6) % 7; // 0 = Monday
   day.setUTCDate(day.getUTCDate() - offset);
   return day;
@@ -39,10 +37,7 @@ export function templateGoal(facts: GoalFacts): string {
  * Themes with neither examples nor puzzles are skipped — a goal with no
  * drills is empty homework.
  */
-export function buildPlanDraft(
-  profile: WeaknessProfile,
-  opts: PlanOptions = {},
-): PlanDraft {
+export function buildPlanDraft(profile: WeaknessProfile, opts: PlanOptions = {}): PlanDraft {
   const maxThemes = opts.maxThemes ?? DEFAULT_MAX_THEMES;
   const drillsPerTheme = opts.drillsPerTheme ?? DEFAULT_DRILLS_PER_THEME;
   const puzzlesPerTheme = opts.puzzlesPerTheme ?? DEFAULT_PUZZLES_PER_THEME;
@@ -52,17 +47,27 @@ export function buildPlanDraft(
   for (const category of profile.topWeaknesses.slice(0, maxThemes)) {
     const stat = profile.categories.find((c) => c.category === category);
 
-    const ownGameDrills: DrillDraft[] = (stat?.examples ?? []).slice(0, drillsPerTheme).map((ex) => ({
-      type: 'own_game',
-      theme: category,
-      fen: ex.fen,
-      sideToMove: ex.userColor,
-      solutionUci: ex.betterMove,
-      ...(ex.betterMoveSan ? { solutionSan: ex.betterMoveSan } : {}),
-      playedMoveSan: ex.playedMove,
-      gameId: ex.gameId,
-      ...(ex.note ? { note: ex.note } : {}),
-    }));
+    const ownGameDrills: DrillDraft[] = (stat?.examples ?? [])
+      .slice(0, drillsPerTheme)
+      .map((ex) => ({
+        type: 'own_game',
+        theme: category,
+        fen: ex.fen,
+        sideToMove: ex.userColor,
+        solutionUci: ex.betterMove,
+        ...(ex.betterMoveSan ? { solutionSan: ex.betterMoveSan } : {}),
+        playedMoveSan: ex.playedMove,
+        gameId: ex.gameId,
+        ...(ex.note ? { note: ex.note } : {}),
+        // Post-solve insight (deep-pass output, drill-insight feature): copied
+        // when the report example carries it — pre-deep-pass reports and
+        // disabled analysis simply leave these unset and the UI falls back to
+        // `note`.
+        ...(ex.explanation ? { explanation: ex.explanation } : {}),
+        ...(ex.variations?.length ? { variations: ex.variations } : {}),
+        ...(typeof ex.cpBefore === 'number' ? { cpBefore: ex.cpBefore } : {}),
+        ...(typeof ex.cpAfter === 'number' ? { cpAfter: ex.cpAfter } : {}),
+      }));
 
     const puzzleDrills: DrillDraft[] = (opts.puzzlesByTheme?.[category] ?? [])
       .slice(0, puzzlesPerTheme)

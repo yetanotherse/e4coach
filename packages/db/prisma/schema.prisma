@@ -199,6 +199,14 @@ model Drill {
   gameId        String? // source game id (ties to the report example)
   puzzleId      String? // Lichess puzzle id (type = 'puzzle', plans/phase-2.md 2.2b)
   note          String? // deterministic factual note from the report
+  // Post-solve insight (deep-pass style, persisted at plan-generation time so a
+  // drill is self-contained and survives report supersede/deletion):
+  // own-game drills copy explanation/variations/cpBefore/cpAfter from the report's
+  // ErrorInstance; puzzle drills get them from a worker engine+LLM analysis pass.
+  explanation   Json?   // MoveExplanation {whatWentWrong, whyBetter, takeaway, source}
+  variations    Json?   // Variation[] (startFen + SAN only, engine-derived)
+  cpBefore      Int?    // user-POV eval before the solution move (own-game: before the mistake)
+  cpAfter       Int?    // user-POV eval after it
   // SM-2-lite scheduling state (plans/phase-2.md 2.3). Null lastReviewedAt =
   // never reviewed (new drill); such drills are due immediately.
   intervalDays   Int       @default(0) // days until next review after last solve

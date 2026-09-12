@@ -27,6 +27,7 @@ import { deepenProfile, type DeepenOptions } from './deepen.js';
 import { narrateExplanations } from './explain.js';
 import { generateReport } from './generate.js';
 import { generateTrainingPlan } from './plan.js';
+import type { DrillExplainOptions } from './drillExplain.js';
 import { generateSlug } from './slug.js';
 import { sendReportReadyEmail } from './notify.js';
 
@@ -52,6 +53,12 @@ export interface RunDeps {
   evalCache?: EvalCachePort;
   /** deep explanation pass; omitted or disabled leaves examples with `note` only */
   deepen?: DeepenOptions & { enabled: boolean };
+  /**
+   * Puzzle-drill insight (run at plan-generation time): engine + LLM analysis
+   * of puzzle positions so the solved-drill view explains why the solution
+   * works. Omitted when disabled; a failure never affects the plan or job.
+   */
+  drillExplain?: DrillExplainOptions;
 }
 
 /** Per-job selection controls chosen by the user (spec feedback #6). */
@@ -115,7 +122,9 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
     if (!stored) {
       const username = isChessCom ? user.chessComUser : user.lichessUser;
       if (!username) {
-        throw new Error(isChessCom ? 'user has no chess.com username' : 'user has no lichess username');
+        throw new Error(
+          isChessCom ? 'user has no chess.com username' : 'user has no lichess username',
+        );
       }
       if (isChessCom && !deps.chessComSource) {
         throw new Error('chess.com game source not configured on this worker');
@@ -238,6 +247,9 @@ export async function runJob(job: JobRecord, user: UserRecord, deps: RunDeps): P
         db,
         { userId: user.id, profile, reportId: report.id },
         deps.llm,
+        new Date(),
+        deps.engine,
+        deps.drillExplain,
       );
     } catch (err) {
       console.warn(
@@ -286,19 +298,18 @@ async function explainMistakes(
       .update({ where: { id: jobId }, data: { stage: 'studying your mistakes' } })
       .catch(() => {});
     const started = Date.now();
-    const { profile: enriched, facts, enrichments } = await deepenProfile(
-      profile,
-      deps.engine,
-      deps.deepen,
-      async (done, total) => {
-        await db.analysisJob
-          .update({
-            where: { id: jobId },
-            data: { stage: `studying your mistakes ${done}/${total}` },
-          })
-          .catch(() => {});
-      },
-    );
+    const {
+      profile: enriched,
+      facts,
+      enrichments,
+    } = await deepenProfile(profile, deps.engine, deps.deepen, async (done, total) => {
+      await db.analysisJob
+        .update({
+          where: { id: jobId },
+          data: { stage: `studying your mistakes ${done}/${total}` },
+        })
+        .catch(() => {});
+    });
     console.log(
       `[runner] job ${jobId} explained ${facts.size} position(s) in ${Date.now() - started}ms`,
     );

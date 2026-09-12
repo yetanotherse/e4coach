@@ -42,6 +42,11 @@ export default async function DrillPage({
       : null;
 
   const meta = CATEGORY_META[row.theme as keyof typeof CATEGORY_META];
+  // Persisted insight (drill-insight feature): own-game drills copy it from the
+  // report example; puzzle drills get it from the worker's analysis pass.
+  // Both nullable — older drills simply keep the plain `note` rendering.
+  const explanation = (row.explanation ?? null) as unknown as DrillData['explanation'];
+  const variations = (row.variations ?? null) as unknown as DrillData['variations'];
   const drill: DrillData = {
     id: row.id,
     type: row.type === 'puzzle' ? 'puzzle' : 'own_game',
@@ -56,6 +61,10 @@ export default async function DrillPage({
     playedMoveSan: row.playedMoveSan,
     gameId: row.gameId,
     note: row.note,
+    ...(explanation ? { explanation } : {}),
+    ...(variations?.length ? { variations } : {}),
+    ...(typeof row.cpBefore === 'number' ? { cpBefore: row.cpBefore } : {}),
+    ...(typeof row.cpAfter === 'number' ? { cpAfter: row.cpAfter } : {}),
   };
 
   return (

@@ -17,6 +17,7 @@ import {
   LlmPlanSchema,
   lichessPuzzleFrom,
   sanForUci,
+  type DrillDraft,
   type GoalFacts,
   type PlanDraft,
   type PuzzleCandidate,
@@ -24,7 +25,9 @@ import {
   type WeaknessCategory,
   type LlmProvider,
 } from '@chess-coach/core';
-import type { PrismaClient } from '@chess-coach/db';
+import type { PrismaClient, Prisma } from '@chess-coach/db';
+import type { ChessEngine } from '@chess-coach/core';
+import { explainPuzzleDrills, type DrillExplainOptions } from './drillExplain.js';
 
 /** Rating band for puzzle drills: the adult-improver beachhead (spec §1). */
 const PUZZLE_RATING_MIN = 800;
@@ -45,6 +48,8 @@ export async function generateTrainingPlan(
   input: { userId: string; profile: WeaknessProfile; reportId: string },
   llm: LlmProvider,
   now: Date = new Date(),
+  engine?: ChessEngine,
+  drillExplain?: DrillExplainOptions,
 ): Promise<string | null> {
   const focusThemes = input.profile.topWeaknesses.slice(0, DEFAULT_MAX_THEMES);
   const draft = buildPlanDraft(input.profile, {
@@ -98,7 +103,7 @@ export async function generateTrainingPlan(
               fen: drill.fen,
               solutionUci: drill.solutionUci,
             },
-        select: { id: true },
+        select: { id: true, explanation: true },
       });
       const drillId =
         existing?.id ??
@@ -117,10 +122,21 @@ export async function generateTrainingPlan(
               ...(drill.gameId ? { gameId: drill.gameId } : {}),
               ...(drill.puzzleId ? { puzzleId: drill.puzzleId } : {}),
               ...(drill.note ? { note: drill.note } : {}),
+              // Post-solve insight (own-game): copied from the report example
+              // so the solved-drill panel shows full report parity.
+              ...insightData(drill),
             },
             select: { id: true },
           })
         ).id;
+      // Dedupe backfill: an older drill (created before insight existed) gains
+      // the new report example's explanation without touching its SRS state.
+      if (existing?.id && !existing.explanation) {
+        const insight = insightData(drill);
+        if (Object.keys(insight).length > 0) {
+          await db.drill.update({ where: { id: existing.id }, data: insight });
+        }
+      }
       await db.planItem.update({
         where: { id: item.id },
         data: { drills: { connect: { id: drillId } } },
@@ -153,7 +169,47 @@ export async function generateTrainingPlan(
   console.log(
     `[plan] plan ${plan.id} created (${items.length} themes, ${drillTotal} drills, ${resurfaced} resurfaced)`,
   );
+
+  // Drill insight: analyze the plan's puzzle drills (never engine-analyzed
+  // anywhere else) so the solved view can explain WHY the solution works.
+  // Engine + LLM + DB writes; any failure leaves drills unexplained — the
+  // plan itself is complete and must not be lost.
+  if (engine && drillExplain && drillExplain.maxDrills > 0) {
+    try {
+      const result = await explainPuzzleDrills(db, [...linkedDrillIds], engine, llm, drillExplain);
+      if (result.explained > 0) {
+        console.log(`[plan] explained ${result.explained} puzzle drill(s)`);
+      }
+    } catch (err) {
+      console.warn(
+        '[plan] puzzle drill insight failed (plan unaffected):',
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   return plan.id;
+}
+
+/** Create/update data carrying a DrillDraft's insight fields, if any. */
+function insightData(
+  drill: Pick<DrillDraft, 'explanation' | 'variations' | 'cpBefore' | 'cpAfter'>,
+): {
+  explanation?: Prisma.InputJsonValue;
+  variations?: Prisma.InputJsonValue;
+  cpBefore?: number;
+  cpAfter?: number;
+} {
+  return {
+    ...(drill.explanation
+      ? { explanation: drill.explanation as unknown as Prisma.InputJsonValue }
+      : {}),
+    ...(drill.variations?.length
+      ? { variations: drill.variations as unknown as Prisma.InputJsonValue }
+      : {}),
+    ...(drill.cpBefore !== undefined ? { cpBefore: drill.cpBefore } : {}),
+    ...(drill.cpAfter !== undefined ? { cpAfter: drill.cpAfter } : {}),
+  };
 }
 
 /**

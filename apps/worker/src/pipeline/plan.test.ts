@@ -86,7 +86,7 @@ function fakeDb() {
                 d.fen === where.fen &&
                 d.solutionUci === where.solutionUci),
         );
-        return found ? { id: found.id } : null;
+        return found ? { id: found.id, explanation: found.explanation ?? null } : null;
       },
       create: async ({ data }: { data: Record<string, unknown> }) => {
         const drill = {
@@ -99,6 +99,12 @@ function fakeDb() {
         };
         drills.push(drill);
         return { id: drill.id };
+      },
+      update: async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+        const drill = drills.find((d) => d.id === where.id);
+        if (!drill) throw new Error(`unknown drill ${where.id}`);
+        Object.assign(drill, data);
+        return drill;
       },
       findMany: async ({
         where,
@@ -298,5 +304,151 @@ describe('generateTrainingPlan — due-drill resurfacing (plans/phase-2.md 2.3)'
     expect(drills).toHaveLength(1); // no duplicate
     expect(items[1]!.linkedDrillIds.has(drills[0]!.id)).toBe(true); // re-linked
     expect(drills[0]!.reviewCount).toBe(2); // SRS state untouched by plan generation
+  });
+
+  it('persists the report example insight onto new own-game drills', async () => {
+    const { db, drills } = fakeDb();
+    const explained = profile({
+      categories: [
+        {
+          category: 'HANGING_PIECE',
+          frequency: 6,
+          estimatedRatingLoss: 180,
+          examples: [
+            example({
+              explanation: {
+                whatWentWrong: 'the queen steps away from its guard',
+                whyBetter: 'Qd3 keeps the queen protected',
+                takeaway: 'check what can be captured',
+                source: 'llm',
+              },
+              variations: [
+                {
+                  kind: 'refutation',
+                  label: 'You played Qxf7#?',
+                  startFen: FEN_1,
+                  sans: ['Qxf7#'],
+                },
+              ],
+            }),
+          ],
+        },
+      ],
+    });
+    await generateTrainingPlan(
+      db,
+      { userId: 'u1', profile: explained, reportId: 'r1' },
+      new MockLlmProvider(),
+      NOW,
+    );
+    expect(drills[0]!.explanation).toEqual({
+      whatWentWrong: 'the queen steps away from its guard',
+      whyBetter: 'Qd3 keeps the queen protected',
+      takeaway: 'check what can be captured',
+      source: 'llm',
+    });
+  });
+
+  it('backfills insight onto a pre-existing unexplained drill without touching SRS state', async () => {
+    const { db, drills } = fakeDb();
+    // First analysis: an old report without deep-pass insight.
+    await generateTrainingPlan(
+      db,
+      { userId: 'u1', profile: profile(), reportId: 'r1' },
+      new MockLlmProvider(),
+      NOW,
+    );
+    expect(drills[0]!.explanation).toBeUndefined();
+    drills[0]!.reviewCount = 4; // solve history accumulated since
+    drills[0]!.dueAt = new Date('2026-09-25T00:00:00Z');
+
+    // Re-analysis: the new report now carries an explanation for the position.
+    const explained = profile({
+      categories: [
+        {
+          category: 'HANGING_PIECE',
+          frequency: 6,
+          estimatedRatingLoss: 180,
+          examples: [
+            example({
+              explanation: {
+                whatWentWrong: 'the queen walks into a capture',
+                whyBetter: 'Qd3 keeps the queen safe',
+                takeaway: 'count defenders first',
+                source: 'template',
+              },
+            }),
+          ],
+        },
+      ],
+    });
+    await generateTrainingPlan(
+      db,
+      { userId: 'u1', profile: explained, reportId: 'r2' },
+      new MockLlmProvider(),
+      NOW,
+    );
+
+    expect(drills).toHaveLength(1); // still deduped, not duplicated
+    expect((drills[0]!.explanation as { takeaway?: string } | undefined)?.takeaway).toBe(
+      'count defenders first',
+    );
+    expect(drills[0]!.reviewCount).toBe(4); // SRS state untouched
+  });
+
+  it('does not overwrite an existing explanation on re-analysis', async () => {
+    const { db, drills } = fakeDb();
+    const explained = profile({
+      categories: [
+        {
+          category: 'HANGING_PIECE',
+          frequency: 6,
+          estimatedRatingLoss: 180,
+          examples: [
+            example({
+              explanation: {
+                whatWentWrong: 'first',
+                whyBetter: 'first',
+                takeaway: 'first',
+                source: 'llm',
+              },
+            }),
+          ],
+        },
+      ],
+    });
+    await generateTrainingPlan(
+      db,
+      { userId: 'u1', profile: explained, reportId: 'r1' },
+      new MockLlmProvider(),
+      NOW,
+    );
+    // Re-analysis produces DIFFERENT prose; the original must be kept.
+    const again = profile({
+      categories: [
+        {
+          category: 'HANGING_PIECE',
+          frequency: 6,
+          estimatedRatingLoss: 180,
+          examples: [
+            example({
+              explanation: {
+                whatWentWrong: 'second',
+                whyBetter: 'second',
+                takeaway: 'second',
+                source: 'llm',
+              },
+            }),
+          ],
+        },
+      ],
+    });
+    await generateTrainingPlan(
+      db,
+      { userId: 'u1', profile: again, reportId: 'r2' },
+      new MockLlmProvider(),
+      NOW,
+    );
+    expect((drills[0]!.explanation as { takeaway?: string } | undefined)?.takeaway).toBe('first');
   });
 });

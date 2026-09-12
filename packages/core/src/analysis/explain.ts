@@ -73,9 +73,9 @@ export interface ExplanationFacts {
   allowedMoves: string[];
 }
 
-const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+export const PIECE_VALUES: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
 
-const PIECE_NAMES: Record<string, string> = {
+export const PIECE_NAMES: Record<string, string> = {
   p: 'pawn',
   n: 'knight',
   b: 'bishop',
@@ -149,7 +149,7 @@ export function materialBalance(fen: string, color: Color): number {
  * Count enemy pieces the piece on `from` attacks that are worth taking. Two or
  * more (or one plus the king) is a fork.
  */
-function forkTargets(chess: Chess, from: Square, byColor: 'w' | 'b'): number {
+export function forkTargets(chess: Chess, from: Square, byColor: 'w' | 'b'): number {
   let targets = 0;
   for (const row of chess.board()) {
     for (const sq of row) {
@@ -193,7 +193,7 @@ const RAYS: Record<string, ReadonlyArray<readonly [number, number]>> = {
  * Look for a pin or skewer created by a slider landing on `from`: walk each ray
  * and check whether two enemy pieces line up behind one another.
  */
-function lineMotifs(chess: Chess, from: Square, byColor: 'w' | 'b'): Motif[] {
+export function lineMotifs(chess: Chess, from: Square, byColor: 'w' | 'b'): Motif[] {
   const piece = chess.get(from);
   if (!piece) return [];
   const rays = RAYS[piece.type];
@@ -217,7 +217,10 @@ function lineMotifs(chess: Chess, from: Square, byColor: 'w' | 'b'): Motif[] {
       found.push({ type: occupant.type, value: PIECE_VALUES[occupant.type] ?? 0 });
     }
     if (found.length < 2) continue;
-    const [front, behind] = found as [{ type: string; value: number }, { type: string; value: number }];
+    const [front, behind] = found as [
+      { type: string; value: number },
+      { type: string; value: number },
+    ];
     if (behind.type === 'k' || behind.value > front.value) motifs.add('pin');
     else if (front.value > behind.value) motifs.add('skewer');
   }
@@ -363,7 +366,7 @@ export function deriveExplanationFacts(input: DeriveInput): ExplanationFacts {
 }
 
 /** What does the engine's move accomplish? Ordered most- to least-teachable. */
-function classifyBestMove(
+export function classifyBestMove(
   fenBefore: string,
   bestSan: string | undefined,
   hangs: HangingPiece | undefined,
@@ -412,7 +415,11 @@ export function renderExplanation(f: ExplanationFacts): RenderedExplanation {
   };
 }
 
-function whatWentWrong(f: ExplanationFacts, punish: string | undefined, motifs: Set<Motif>): string {
+function whatWentWrong(
+  f: ExplanationFacts,
+  punish: string | undefined,
+  motifs: Set<Motif>,
+): string {
   if (!punish) {
     return `${f.playedSan} loses ground here.`;
   }
@@ -462,7 +469,7 @@ function whatWentWrong(f: ExplanationFacts, punish: string | undefined, motifs: 
   return parts.join(' ');
 }
 
-function whyBetter(f: ExplanationFacts): string {
+export function whyBetter(f: ExplanationFacts): string {
   if (!f.bestSan) return '';
   const best = f.variations.find((v) => v.kind === 'best');
   const continuation =
@@ -494,7 +501,7 @@ function whyBetter(f: ExplanationFacts): string {
   return `${lead}${continuation}${also}`;
 }
 
-function takeaway(f: ExplanationFacts, motifs: Set<Motif>): string {
+export function takeaway(f: ExplanationFacts, motifs: Set<Motif>): string {
   // Most specific lesson first. A fork that happens to start with a capture
   // should teach the fork, not "you left a pawn loose".
   if (motifs.has('mate')) {

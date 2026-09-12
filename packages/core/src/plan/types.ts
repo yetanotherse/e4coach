@@ -4,6 +4,8 @@
  * used) only rephrases the per-theme goal prose around those facts.
  */
 import type { WeaknessCategory } from '../taxonomy.js';
+import type { MoveExplanation } from '../profile.js';
+import type { Variation } from '../analysis/explain.js';
 
 /** One position to re-solve: from the user's own games, or from the Lichess puzzle DB. */
 export interface DrillDraft {
@@ -28,6 +30,21 @@ export interface DrillDraft {
   note?: string;
   /** Lichess puzzle id (puzzle drills only) */
   puzzleId?: string;
+  /**
+   * Post-solve insight persisted on the Drill row (drill-insight feature):
+   * own-game drills copy the report example's explanation and engine
+   * variations; puzzle drills get the same fields from the worker's
+   * engine+LLM analysis pass (apps/worker drillExplain). All optional —
+   * absent on pre-deep-pass reports and whenever analysis is unavailable,
+   * in which case the UI keeps showing `note` only.
+   */
+  explanation?: MoveExplanation;
+  /** engine lines (startFen + SAN only), already trimmed for JSONB storage */
+  variations?: Variation[];
+  /** user-POV eval before the solution move (own-game: before the mistake) */
+  cpBefore?: number;
+  /** user-POV eval after it */
+  cpAfter?: number;
 }
 
 /** One focus theme of a weekly plan, with its coach-voiced goal. */
