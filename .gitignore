@@ -23,3 +23,6 @@ packages/db/generated/
 .vscode/
 playwright-report/
 test-results/
+
+# temporary scratch notes — never commit
+DOMAIN_IDEAS
