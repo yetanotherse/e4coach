@@ -5,3 +5,4 @@ coverage
 packages/db/generated
 pnpm-lock.yaml
 *.pgn
+LICENSE
