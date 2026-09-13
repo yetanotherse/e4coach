@@ -9,6 +9,8 @@ a **weekly training plan**, and **drills** built from your own games.
 > Spec & architecture background: [`plans/chess-coach-spec.md`](plans/chess-coach-spec.md).
 > Not affiliated with Lichess or Chess.com.
 
+**Live demo:** [https://www.e4coach.com](https://www.e4coach.com) · [https://e4coach.vercel.app](https://e4coach.vercel.app)
+
 ## What it does
 
 1. **Sign up** with email + chess platform username (magic link or 6-digit email OTP;
