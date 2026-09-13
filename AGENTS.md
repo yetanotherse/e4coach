@@ -6,6 +6,8 @@ Instructions for AI coding agents working in this repo.
 
 **Chess Coach** — an AI-native coaching layer over games users already play (Lichess/Chess.com). It imports a user's recent games, evaluates them with Stockfish, classifies mistakes into a weakness taxonomy, and generates grounded weakness reports, training plans, and drills.
 
+Licensed under **MIT** (see `LICENSE`). The `plans/` directory is public — keep it free of personal names and credentials.
+
 The MVP shipped (spec phases A–E complete). The project is now in **Phase 2** (coaching product: auth hardening, Chess.com source, plans/drills, SRS).
 
 ## Source-of-truth documents (read when scope/architecture matters)

@@ -1,6 +1,6 @@
 # Chess Coach — Product & Engineering Specification
 
-*Version 1.0 · July 2026 · Owner: Shishir · Audience: Claude Code (implementation agent) + engineers*
+_Version 1.0 · July 2026 · Audience: implementation agents + engineers_
 
 > This is the single source of truth. It covers the **MVP** in build-ready detail and lists **all future phases** so the whole roadmap lives in one place. Build strictly in the order given in §14. Anything marked **[MVP]** is in scope now; **[P2]/[P3]/[P4]** are future.
 
@@ -18,26 +18,26 @@
 
 ## 1. Product vision & the one-line thesis
 
-**Vision:** *A personal chess coach — a structured school, not a toolbox.* An AI-native coaching layer that works on top of the games users already play (Lichess/Chess.com), diagnoses their specific weaknesses, and turns them into a guided improvement path.
+**Vision:** _A personal chess coach — a structured school, not a toolbox._ An AI-native coaching layer that works on top of the games users already play (Lichess/Chess.com), diagnoses their specific weaknesses, and turns them into a guided improvement path.
 
-**MVP thesis to validate:** *Adult improvers (≈800–1600) will give us their email and come back, if we turn their own games into a clear, personal weakness report for free.* If they do, the wedge is real and we build the full coaching product. If they don't, we stop before heavy investment.
+**MVP thesis to validate:** _Adult improvers (≈800–1600) will give us their email and come back, if we turn their own games into a clear, personal weakness report for free._ If they do, the wedge is real and we build the full coaching product. If they don't, we stop before heavy investment.
 
 ---
 
 ## 2. MVP goal & success criteria (this is the whole point)
 
-The MVP is a **demand-validation instrument**, not a coaching product. It must cheaply answer: *do people want this, and do they come back?*
+The MVP is a **demand-validation instrument**, not a coaching product. It must cheaply answer: _do people want this, and do they come back?_
 
 **Primary validation metrics (instrument from day one):**
 
-| Metric | Definition | Rough "green light" signal |
-|---|---|---|
-| **Sign-up conversion** | % of landing visitors who submit email + username | ≥ 15–25% of engaged visitors |
-| **Report completion** | % of sign-ups who receive & view a full report | ≥ 80% |
-| **Return rate (the key one)** | % of users who come back ≥ 1 time within 7 days without a nudge | ≥ 25–30% |
-| **Re-analysis rate** | % who import/analyze a second batch of games | ≥ 20% |
-| **Willingness-to-pay signal** | clicks on a "Get my weekly training plan — notify me / $X" fake-door | ≥ 15% of report viewers |
-| **Qualitative** | ≥ 15 user interviews / feedback submissions | n/a |
+| Metric                        | Definition                                                           | Rough "green light" signal   |
+| ----------------------------- | -------------------------------------------------------------------- | ---------------------------- |
+| **Sign-up conversion**        | % of landing visitors who submit email + username                    | ≥ 15–25% of engaged visitors |
+| **Report completion**         | % of sign-ups who receive & view a full report                       | ≥ 80%                        |
+| **Return rate (the key one)** | % of users who come back ≥ 1 time within 7 days without a nudge      | ≥ 25–30%                     |
+| **Re-analysis rate**          | % who import/analyze a second batch of games                         | ≥ 20%                        |
+| **Willingness-to-pay signal** | clicks on a "Get my weekly training plan — notify me / $X" fake-door | ≥ 15% of report viewers      |
+| **Qualitative**               | ≥ 15 user interviews / feedback submissions                          | n/a                          |
 
 **Explicit non-goals for MVP:** no live play, no full curriculum, no accountability engine, no payments, no mobile-native app, no social features, no Maia. Those are future phases and must not be built now.
 
@@ -65,11 +65,11 @@ Live/multiplayer play, curriculum/lessons, spaced-repetition trainer, payments/b
 
 ### 3.3 MVP user stories
 
-- *As a visitor*, I understand in 10 seconds what I get and give my email + Lichess username.
-- *As a new user*, my recent games are imported and analyzed within a few minutes; I'm emailed when ready (and shown live progress if I wait).
-- *As a user*, I see a clear report: my top weaknesses, plain-language explanations, and my own game positions illustrating each.
-- *As a returning user*, I can re-open my report via a link and analyze a fresh batch of games.
-- *As the founder*, I can see the funnel and retention in an analytics dashboard.
+- _As a visitor_, I understand in 10 seconds what I get and give my email + Lichess username.
+- _As a new user_, my recent games are imported and analyzed within a few minutes; I'm emailed when ready (and shown live progress if I wait).
+- _As a user_, I see a clear report: my top weaknesses, plain-language explanations, and my own game positions illustrating each.
+- _As a returning user_, I can re-open my report via a link and analyze a fresh batch of games.
+- _As the founder_, I can see the funnel and retention in an analytics dashboard.
 
 ---
 
@@ -129,27 +129,27 @@ Design the pipeline as **idempotent, resumable stages** with per-stage status so
 
 ## 6. Technology stack (decisions + rationale)
 
-| Concern | Choice | Rationale / notes |
-|---|---|---|
-| Language | **TypeScript** (strict) everywhere | One language across app + worker; strong typing for chess domain. |
-| App framework | **Next.js 14+ (App Router), React 18** | Single codebase for marketing site + app + API routes; great SEO for landing; fast to ship. |
-| Styling / UI | **Tailwind CSS + shadcn/ui** | Fast, consistent, accessible primitives. |
-| Chess board UI | **Chessground** + **chess.js** | Chessground for rendering positions in the report; chess.js for PGN parsing/legality. |
-| Chess engine | **Stockfish** (native binary in worker; **stockfish.js/WASM** fallback) | Server-side native = far faster batch eval than WASM. WASM kept as an adapter option. |
-| LLM | **Gemini Flash** (default) **behind `LlmProvider` interface** | Cheap, fast, adequate for report prose. Swappable (see §8). |
-| DB | **Postgres** via **Neon** or **Supabase** | Relational fits users/jobs/games/reports; serverless-friendly. |
-| ORM | **Prisma** | Type-safe schema + migrations. |
-| Auth | **Magic link (passwordless)** via Auth.js *or* Supabase Auth | Lowest friction; email is the asset we're capturing; enables return-visit tracking. |
-| Background jobs | **DB-backed queue** for MVP (or **Inngest**) | Keep infra minimal. A `jobs` table + worker poll loop is enough at MVP volume. Inngest if you want retries/observability out of the box. |
-| Worker hosting | **Render** or **Fly.io** (always-on small instance) | Needs a persistent process + native Stockfish binary. |
-| App hosting | **Vercel** | First-class Next.js. |
-| Analytics | **PostHog** (cloud) | Funnels, retention cohorts, session replay, feature flags, fake-door tracking — exactly the MVP's job. |
-| Email | **Resend** (or Postmark) | Simple transactional email + React email templates. |
-| Error monitoring | **Sentry** | App + worker. |
-| Validation | **Zod** | Runtime validation at all boundaries (API input, external API responses, env). |
-| Testing | **Vitest** (unit), **Playwright** (e2e) | Fast unit runner; e2e for the critical funnel. |
-| Lint/format | **ESLint + Prettier**, **TypeScript strict** | Enforced in CI. |
-| Package mgr / mono | **pnpm workspaces** (monorepo: `app`, `worker`, shared `core`) | Share domain + types between app and worker. |
+| Concern            | Choice                                                                  | Rationale / notes                                                                                                                        |
+| ------------------ | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | **TypeScript** (strict) everywhere                                      | One language across app + worker; strong typing for chess domain.                                                                        |
+| App framework      | **Next.js 14+ (App Router), React 18**                                  | Single codebase for marketing site + app + API routes; great SEO for landing; fast to ship.                                              |
+| Styling / UI       | **Tailwind CSS + shadcn/ui**                                            | Fast, consistent, accessible primitives.                                                                                                 |
+| Chess board UI     | **Chessground** + **chess.js**                                          | Chessground for rendering positions in the report; chess.js for PGN parsing/legality.                                                    |
+| Chess engine       | **Stockfish** (native binary in worker; **stockfish.js/WASM** fallback) | Server-side native = far faster batch eval than WASM. WASM kept as an adapter option.                                                    |
+| LLM                | **Gemini Flash** (default) **behind `LlmProvider` interface**           | Cheap, fast, adequate for report prose. Swappable (see §8).                                                                              |
+| DB                 | **Postgres** via **Neon** or **Supabase**                               | Relational fits users/jobs/games/reports; serverless-friendly.                                                                           |
+| ORM                | **Prisma**                                                              | Type-safe schema + migrations.                                                                                                           |
+| Auth               | **Magic link (passwordless)** via Auth.js _or_ Supabase Auth            | Lowest friction; email is the asset we're capturing; enables return-visit tracking.                                                      |
+| Background jobs    | **DB-backed queue** for MVP (or **Inngest**)                            | Keep infra minimal. A `jobs` table + worker poll loop is enough at MVP volume. Inngest if you want retries/observability out of the box. |
+| Worker hosting     | **Render** or **Fly.io** (always-on small instance)                     | Needs a persistent process + native Stockfish binary.                                                                                    |
+| App hosting        | **Vercel**                                                              | First-class Next.js.                                                                                                                     |
+| Analytics          | **PostHog** (cloud)                                                     | Funnels, retention cohorts, session replay, feature flags, fake-door tracking — exactly the MVP's job.                                   |
+| Email              | **Resend** (or Postmark)                                                | Simple transactional email + React email templates.                                                                                      |
+| Error monitoring   | **Sentry**                                                              | App + worker.                                                                                                                            |
+| Validation         | **Zod**                                                                 | Runtime validation at all boundaries (API input, external API responses, env).                                                           |
+| Testing            | **Vitest** (unit), **Playwright** (e2e)                                 | Fast unit runner; e2e for the critical funnel.                                                                                           |
+| Lint/format        | **ESLint + Prettier**, **TypeScript strict**                            | Enforced in CI.                                                                                                                          |
+| Package mgr / mono | **pnpm workspaces** (monorepo: `app`, `worker`, shared `core`)          | Share domain + types between app and worker.                                                                                             |
 
 **D2 — Monorepo with a shared `core` package.** The domain (types, weakness taxonomy, analysis logic, adapters interfaces) lives in `packages/core`, imported by both `apps/web` and `apps/worker`. Prevents drift and duplicated chess logic.
 
@@ -166,6 +166,7 @@ Design the pipeline as **idempotent, resumable stages** with per-stage status so
 - Handle: unknown username, private/zero games, streams that time out, non-standard variants (filter to standard chess for MVP).
 
 ### 7.2 Chess.com API [P2, stub only]
+
 Public API (`api.chess.com/pub/player/{u}/games/...`) is monthly-archive based. Define the adapter interface now; implement later.
 
 ### 7.3 Gemini (LLM) [MVP] — see §8.
@@ -181,21 +182,24 @@ All four must be interfaces in `packages/core`, with concrete adapters selected 
 ### 8.1 `LlmProvider` (Gemini Flash default)
 
 ```ts
-export interface LlmMessage { role: 'system' | 'user' | 'assistant'; content: string; }
+export interface LlmMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 export interface LlmGenerateOptions {
-  model?: string;            // provider-specific id; default from config
-  temperature?: number;      // default 0.4
+  model?: string; // provider-specific id; default from config
+  temperature?: number; // default 0.4
   maxOutputTokens?: number;
   responseFormat?: 'text' | 'json';
-  jsonSchema?: object;       // when responseFormat === 'json'
+  jsonSchema?: object; // when responseFormat === 'json'
   timeoutMs?: number;
   metadata?: Record<string, string>; // for tracing/cost attribution
 }
 
 export interface LlmResult {
   text: string;
-  parsed?: unknown;          // when json
+  parsed?: unknown; // when json
   usage?: { inputTokens: number; outputTokens: number };
   model: string;
   provider: string;
@@ -209,33 +213,55 @@ export interface LlmProvider {
 
 - Provide `GeminiFlashProvider` (default) and a `MockLlmProvider` (deterministic, for tests/offline).
 - Config: `LLM_PROVIDER=gemini|mock`, `LLM_MODEL=gemini-2.x-flash`, plus a **retry/backoff + timeout wrapper** and **cost logging** (tokens → PostHog/DB) shared across providers.
-- **Grounding rule:** the LLM must only *explain and phrase* facts already computed by the engine/classifier. It must never invent evaluations, moves, or tactics. Pass it a structured, pre-computed weakness profile and require it to write prose around those facts. Prefer `responseFormat: 'json'` with a fixed schema, then render deterministically.
+- **Grounding rule:** the LLM must only _explain and phrase_ facts already computed by the engine/classifier. It must never invent evaluations, moves, or tactics. Pass it a structured, pre-computed weakness profile and require it to write prose around those facts. Prefer `responseFormat: 'json'` with a fixed schema, then render deterministically.
 
 ### 8.2 `ChessEngine`
 
 ```ts
-export interface EngineEval { cp?: number; mate?: number; bestMove: string; pv: string[]; depth: number; }
+export interface EngineEval {
+  cp?: number;
+  mate?: number;
+  bestMove: string;
+  pv: string[];
+  depth: number;
+}
 export interface ChessEngine {
   evaluate(fen: string, opts: { depth?: number; movetimeMs?: number }): Promise<EngineEval>;
   dispose(): Promise<void>;
 }
 ```
+
 - `StockfishNativeEngine` (UCI over child process, pooled) default in worker; `StockfishWasmEngine` fallback.
 
 ### 8.3 `GameSource`
 
 ```ts
-export interface ImportedGame { id: string; pgn: string; white: string; black: string;
-  userColor: 'white' | 'black'; result: string; timeControl: string; eco?: string;
-  clocks?: number[]; evals?: EngineEval[]; playedAt: string; }
+export interface ImportedGame {
+  id: string;
+  pgn: string;
+  white: string;
+  black: string;
+  userColor: 'white' | 'black';
+  result: string;
+  timeControl: string;
+  eco?: string;
+  clocks?: number[];
+  evals?: EngineEval[];
+  playedAt: string;
+}
 export interface GameSource {
   readonly name: string;
-  fetchRecentGames(username: string, opts: { max: number; rated?: boolean; perfTypes?: string[] }): Promise<ImportedGame[]>;
+  fetchRecentGames(
+    username: string,
+    opts: { max: number; rated?: boolean; perfTypes?: string[] },
+  ): Promise<ImportedGame[]>;
 }
 ```
+
 - `LichessGameSource` [MVP]; `ChessComGameSource` [P2]; `PgnUploadSource` [P2].
 
 ### 8.4 `Analytics` and `Mailer`
+
 Thin interfaces over PostHog and Resend so they're testable and swappable.
 
 ---
@@ -251,27 +277,30 @@ This is the part that must be genuinely good; everything else is scaffolding.
 3. **Evaluate** — for each position (the mover = our user), get eval before and after the played move. Use provided `evals` when available; else `ChessEngine.evaluate` at a **budgeted depth/movetime** (e.g., depth 12–16 or ~100–200ms/move — tune for cost/latency). Skip trivial/forced positions to save compute.
 4. **Score moves** — compute **centipawn loss (CPL)** per user move = eval(best) − eval(played), clamped; flag **inaccuracy / mistake / blunder** by thresholds (align with Lichess conventions, e.g. ~50/100/300 cp, capped by win-probability delta for robustness).
 5. **Classify errors into a weakness taxonomy** (heuristics over engine + board features):
-   - *Hanging pieces / blunders of material* (undefended piece captured next move).
-   - *Missed tactics* (a large swing where a forcing tactic existed — detect via best-move being a capture/check/fork motif and big CPL).
-   - *Opening problems* (early large CPL / deviation from known theory within first ~10 moves; use ECO/opening name).
-   - *Converting winning positions* (had eval ≥ +2.0, result not a win → conversion failure).
-   - *Defending / resourcefulness* (eval ≤ −2.0 then further collapse vs. holding).
-   - *Endgame technique* (errors when ≤ ~7 pieces).
-   - *Time management* (large CPL correlated with low remaining clock, from `clocks`).
+   - _Hanging pieces / blunders of material_ (undefended piece captured next move).
+   - _Missed tactics_ (a large swing where a forcing tactic existed — detect via best-move being a capture/check/fork motif and big CPL).
+   - _Opening problems_ (early large CPL / deviation from known theory within first ~10 moves; use ECO/opening name).
+   - _Converting winning positions_ (had eval ≥ +2.0, result not a win → conversion failure).
+   - _Defending / resourcefulness_ (eval ≤ −2.0 then further collapse vs. holding).
+   - _Endgame technique_ (errors when ≤ ~7 pieces).
+   - _Time management_ (large CPL correlated with low remaining clock, from `clocks`).
 6. **Aggregate → WeaknessProfile** — per category: frequency, estimated rating-points lost (heuristic from CPL), trend, and up to 3 representative example positions (FEN + game link + the better move).
 7. **Rank** — top 3 weaknesses by estimated impact.
 8. **Report generation** — feed the structured profile to `LlmProvider` (JSON-schema output) → human-readable report; render deterministically with Chessground boards.
 
 ### 9.2 Error taxonomy (enumerate in `core`)
+
 `HANGING_PIECE`, `MISSED_TACTIC`, `OPENING_INACCURACY`, `FAILED_CONVERSION`, `WEAK_DEFENSE`, `ENDGAME_TECHNIQUE`, `TIME_TROUBLE`, `POSITIONAL_DRIFT`. Each has: id, display name, plain-language description template, and a detector function `(context) => ErrorInstance | null`.
 
 ### 9.3 Quality & correctness guardrails
+
 - Deterministic given same games + engine settings (fix engine version/depth; record them on the job for reproducibility).
 - Unit-test each detector against curated PGN fixtures with known errors (§10).
 - The report must cite **real positions from the user's games** (FEN + move number + link). No fabricated examples.
 - Keep a "confidence" note when sample size is small (< ~10 games).
 
 ### 9.4 Cost & latency budget
+
 - Target: analyze ~20 games in a few minutes for well under ~$0.05 LLM cost/report (one or two Gemini Flash calls). Cache engine evals. Reuse Lichess-provided evals. Log per-job compute + token cost to detect blowups early.
 
 ---
@@ -328,11 +357,13 @@ enum JobStatus { PENDING FETCHING EVALUATING CLASSIFYING GENERATING DONE FAILED 
 ## 11. Non-functional requirements
 
 ### 11.1 Performance
+
 - Landing page: static/SSG, LCP < 2s.
 - Report ready target: p50 < 3 min, p95 < 8 min for 20 games. Show live progress (`AnalysisJob.stage`).
 - Engine pool sized to worker CPU; bound concurrent jobs.
 
 ### 11.2 Security
+
 - Zod-validate all inputs and all external API responses.
 - Secrets only in env (never client); never expose LLM/engine keys to the browser.
 - Report links use unguessable slugs; no PII in the slug. Rate-limit report creation per email/IP.
@@ -340,21 +371,25 @@ enum JobStatus { PENDING FETCHING EVALUATING CLASSIFYING GENERATING DONE FAILED 
 - Dependency scanning in CI (e.g., `pnpm audit`).
 
 ### 11.3 Privacy & compliance
+
 - Collect the minimum: email + public chess username. Public-facing **privacy policy** + **consent checkbox** at sign-up.
 - Clear "delete my data" path (delete User + cascade). GDPR-minded even if not strictly required.
 - Only import **public** games; state this explicitly to the user.
 - Don't send game PGNs to the LLM beyond what's needed; send the structured profile + minimal position context.
 
 ### 11.4 Reliability & rate limiting
+
 - Respect Lichess rate limits; exponential backoff on 429; descriptive `User-Agent`.
 - Pipeline stages idempotent + resumable; per-game failures isolated (skip + record, don't fail the whole job).
 - Retries with backoff on LLM/engine transient errors; hard timeouts everywhere.
 - Circuit-break the LLM: if it fails, still deliver a **template-only report** from the structured profile (graceful degradation).
 
 ### 11.5 Observability
+
 - Structured logs (job id, stage, timings). Sentry for exceptions. Per-job metrics: games, eval count, engine time, tokens, $ cost. PostHog for product funnel.
 
 ### 11.6 Coding standards
+
 - TypeScript strict; no `any` at module boundaries. Zod schemas are the source of truth for external shapes.
 - Pure domain logic in `core` (no I/O); adapters do I/O. Small, tested functions for each detector.
 - Conventional commits; PRs small and reviewable. ESLint/Prettier enforced in CI.
@@ -389,21 +424,21 @@ chess-coach/
 
 Keep it small. REST-style route handlers in `apps/web/app/api`:
 
-| Method / route | Purpose |
-|---|---|
-| `POST /api/signup` | body: `{ email, lichessUser, consent }` → create/lookup User, send magic link, create AnalysisJob, return job id. |
-| `GET /api/job/:id` | poll job status/stage for the progress screen. |
-| `GET /api/report/:slug` | fetch rendered report (increments viewCount). Public-but-unguessable. |
-| `POST /api/analyze` | authed: start a new AnalysisJob for existing user ("analyze new games"). |
-| `POST /api/interest` | fake-door: record WTP click `{ tier }` → PostHog + DB. |
-| `POST /api/auth/*` | magic-link callback (Auth.js/Supabase). |
-| `DELETE /api/me` | delete user + data. |
+| Method / route          | Purpose                                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `POST /api/signup`      | body: `{ email, lichessUser, consent }` → create/lookup User, send magic link, create AnalysisJob, return job id. |
+| `GET /api/job/:id`      | poll job status/stage for the progress screen.                                                                    |
+| `GET /api/report/:slug` | fetch rendered report (increments viewCount). Public-but-unguessable.                                             |
+| `POST /api/analyze`     | authed: start a new AnalysisJob for existing user ("analyze new games").                                          |
+| `POST /api/interest`    | fake-door: record WTP click `{ tier }` → PostHog + DB.                                                            |
+| `POST /api/auth/*`      | magic-link callback (Auth.js/Supabase).                                                                           |
+| `DELETE /api/me`        | delete user + data.                                                                                               |
 
 Validate every body with Zod; return typed errors.
 
 ---
 
-## 14. Build order for Claude Code (do in this sequence)
+## 14. Build order (do in this sequence)
 
 Each step ends in something runnable/testable. Do not jump ahead.
 
@@ -456,8 +491,10 @@ Listed here so the whole plan lives in one document. Gate each phase on the prio
 
 > **Build-ready plans live in `plans/`** (e.g. `plans/phase-2.md`). Each active phase gets its own plan file there with locked decisions, sub-phase breakdown, data-model changes, and verification criteria. This future-phases section stays as the high-level roadmap only.
 
-## Phase 2 — The core coaching product [P2] *(only if MVP validates)*
+## Phase 2 — The core coaching product [P2] _(only if MVP validates)_
+
 Turn the one-shot report into an ongoing product for the **adult improver beachhead (≈800–1600)**.
+
 - **Adaptive weekly training plan** generated from the weakness profile ("this week: back-rank awareness + this endgame").
 - **Targeted drills from the user's own games** + thematically matched master positions.
 - **Plain-language "why" coaching** on demand for any position (grounded engine + LLM).
@@ -468,12 +505,14 @@ Turn the one-shot report into an ongoing product for the **adult improver beachh
 - Harden the engine tier (dedicated eval service, deeper analysis, caching layer).
 
 ## Phase 3 — Human-like coaching & the beginner journey [P3]
+
 - **Maia / Maia-2 integration** (behind `ChessEngine`/new `HumanModel` interface) for **style-aware sparring**, "what a player like you would do," and blunder prediction — the differentiation vs. plain Stockfish.
 - **Zero-to-1500 guided curriculum** — the "school not a library" on-ramp: a single adaptive path, plain-language lessons, mastery tracking (second beachhead / funnel top).
 - **Conversational coach** during play (Dr. Wolf-style, but integrated into the improvement plan).
 - Live "play a coached game" mode (Chessground + engine/Maia) with real-time feedback.
 
 ## Phase 4 — Depth, scale & platform [P4]
+
 - **Advanced-player module (1800–2200):** opening-prep depth, conversion technique, defense, time management, style diagnosis — highest willingness-to-pay cohort.
 - **Native mobile apps** (React Native / Capacitor over the same core).
 - **Coach/parent dashboards, teams, cohorts**; potential B2B (clubs, academies, scholastic).
@@ -482,7 +521,8 @@ Turn the one-shot report into an ongoing product for the **adult improver beachh
 - Model/eval infra scaling; possible fine-tuned individual-behavior models per the recent research.
 
 ## Sequencing principle
-Each phase is gated on evidence: MVP proves *demand*; P2 proves *retention + willingness to pay*; P3 expands *segments*; P4 scales *platform*. Never build the next phase before the current one's metric clears.
+
+Each phase is gated on evidence: MVP proves _demand_; P2 proves _retention + willingness to pay_; P3 expands _segments_; P4 scales _platform_. Never build the next phase before the current one's metric clears.
 
 ---
 
@@ -494,4 +534,4 @@ Each phase is gated on evidence: MVP proves *demand*; P2 proves *retention + wil
 4. **Gemini Flash** default confirmed; interface makes swaps trivial.
 5. **~20–40 games/report** default batch — tune after first cost measurements.
 
-*Nothing here blocks starting §14. These only affect a few defaults.*
+_Nothing here blocks starting §14. These only affect a few defaults._

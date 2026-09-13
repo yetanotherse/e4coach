@@ -1,19 +1,19 @@
 # Phase 2 Plan — The Core Coaching Product
 
-*Owner: Shishir · Status: approved 2026-09 · Builds on the shipped MVP (see `chess-coach-spec.md` §14 in this directory, now complete)*
+_Status: approved 2026-09 · Builds on the shipped MVP (see `chess-coach-spec.md` §14 in this directory, now complete)_
 
 > Going forward, each phase gets its own plan file in `plans/` (e.g. `plans/phase-3.md`). This file is the source of truth for Phase 2; the spec remains the source of truth for MVP scope and architecture principles (§0, §5.2, §8, §11.6).
 
-## Decisions locked (owner-confirmed 2026-09)
+## Decisions locked (2026-09)
 
-| # | Decision |
-|---|---|
-| D-P2-1 | **Auth**: magic link (already built) wired into signup **plus** email OTP (6-digit) as an alternative; 30-day sliding session. |
+| #      | Decision                                                                                                                                                                                          |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-P2-1 | **Auth**: magic link (already built) wired into signup **plus** email OTP (6-digit) as an alternative; 30-day sliding session.                                                                    |
 | D-P2-2 | **Payments DEFERRED.** No gateway code (Stripe or otherwise). Keep neutral stubs/hooks (entitlements, pricing tiers, a `Billing` port) so any gateway can plug in later. Fake-door stays for now. |
-| D-P2-3 | **Paywall shape (when built)**: free = weakness reports; paid = coaching (plans/drills/SRS/accountability). `Interest.tier` monthly/annual values already encode intent. |
-| D-P2-4 | **Drills**: user's own games first + thematically matched positions from the **Lichess puzzle DB (CC-BY)**, ingested as a filtered per-theme slice. |
-| D-P2-5 | **Build order**: strictly 2.0 → 2.1 → 2.2 → 2.3 → 2.4; each sub-phase ends shippable + tested. |
-| D-P2-6 | PGN upload is already shipped (MVP+); it is NOT re-planned. |
+| D-P2-3 | **Paywall shape (when built)**: free = weakness reports; paid = coaching (plans/drills/SRS/accountability). `Interest.tier` monthly/annual values already encode intent.                          |
+| D-P2-4 | **Drills**: user's own games first + thematically matched positions from the **Lichess puzzle DB (CC-BY)**, ingested as a filtered per-theme slice.                                               |
+| D-P2-5 | **Build order**: strictly 2.0 → 2.1 → 2.2 → 2.3 → 2.4; each sub-phase ends shippable + tested.                                                                                                    |
+| D-P2-6 | PGN upload is already shipped (MVP+); it is NOT re-planned.                                                                                                                                       |
 
 ## Current-state baseline (what exists as of this plan)
 
@@ -23,7 +23,7 @@
 
 ---
 
-## 2.0 — Auth completion + platform hardening *(DONE 2026-09)*
+## 2.0 — Auth completion + platform hardening _(DONE 2026-09)_
 
 **Goal:** every user ends up with a real session; abuse surface closed; observability live.
 
@@ -37,7 +37,7 @@
 
 **Verification done:** lint/typecheck/233 unit tests green (incl. new otp/rateLimit/tokenEdge tests); web build green with middleware; live smoke: otp request → verify → httpOnly 30-day session cookie set → replay rejected; rate-limit upsert verified against Supabase; signup smoke with mock mailer. OTP happy-path e2e is impractical (mock mailer is in-process) — covered by unit tests + manual smoke instead.
 
-## 2.1 — Chess.com game source *(DONE 2026-09)*
+## 2.1 — Chess.com game source _(DONE 2026-09)_
 
 1. **`ChessComGameSource`** ✅ — `packages/adapters/src/chesscom/`: archives list (sorted newest-first — the API returns them unsorted) walked newest→oldest until `max` collected; Zod-validated responses; rules=chess + rated/time_class filters; 429/5xx backoff with Retry-After; `[ECO]` code from PGN tags (the API's `eco` field is a URL); per-move clocks parsed from `[%clk]` PGN comments into centiseconds (enables the TIME_TROUBLE detector); injectable fetch with fixture tests.
 2. **Wiring** ✅ — `createGameSourceFor(env, source)` factory (mock env → always mock, so dev/e2e are unaffected); worker `RunDeps.chessComSource` + per-source username checks in the FETCHING stage; poller passes `chessComUser`.
@@ -47,12 +47,14 @@
 
 ## 2.2 — Training plans + drills (the core value; largest)
 
-> **Decision (owner-confirmed 2026-09): 2.2 is split into two independently shippable halves.**
+> **Decision (2026-09): 2.2 is split into two independently shippable halves.**
+>
 > - **2.2a — Own-game plans & drills:** `TrainingPlan`/`PlanItem`/`Drill`/`DrillAttempt` schema; deterministic plan generator (WeaknessProfile → weekly plan, template goals with optional LLM phrasing behind the existing port); drills sourced from the user's own game mistakes (report examples → positions); plan page + Chessground solve UI. **Shipped first.**
 > - **2.2b — Puzzle drills + polish:** Lichess puzzle DB ingestion (theme-tag filtered slice → `Puzzle` table), thematic master-position drills mixed into weekly plans, drill scoring/accuracy feedback, eval cache (`EvalCache`) for drill re-evaluation.
-> Rationale: 2.2a delivers the full coach loop (profile → plan → drill → solve) on data we already have; 2.2b adds the external content slice without blocking the core loop.
+>   Rationale: 2.2a delivers the full coach loop (profile → plan → drill → solve) on data we already have; 2.2b adds the external content slice without blocking the core loop.
 
 ### 2.2a — DONE (2026-09)
+
 1. **Schema** ✅ — migration `0000000000006_training_plans`: `TrainingPlan` (one active per user+weekStart; re-analysis supersedes), `PlanItem` (theme + goal), `Drill` (**user-owned**, m-n linked to plan items, deduped by userId+theme+fen+solutionUci so drills survive re-analysis and can recur weekly — SRS-ready), `DrillAttempt`.
 2. **Core plan module** ✅ — `buildPlanDraft(profile)`: top themes by impact (≤2), drills from real report examples (≤5/theme), Monday-UTC weekStart, template goals from `CATEGORY_META`; `prompts/plan.ts` LLM goal phrasing with the report prompt's grounding contract (unknown themes rejected; any failure → template goals).
 3. **Worker** ✅ — `pipeline/plan.ts` runs after report persist; failure logged, never fails the job.
@@ -81,7 +83,7 @@
 
 **Verification:** fixture-driven unit tests for plan assembly + drill scoring; Playwright: report → plan → solve a drill.
 
-## 2.3 — Spaced repetition *(DONE 2026-09)*
+## 2.3 — Spaced repetition _(DONE 2026-09)_
 
 1. **Schema** ✅ — migration `0000000000008_drill_srs`: `Drill` gains SM-2-lite state (`intervalDays`, `ease`, `dueAt`, `lastReviewedAt`, `reviewCount`). Defaults backfill existing drills as due-now; new index `[userId, dueAt]`.
 2. **SM-2-lite core** ✅ — `core/src/plan/srs.ts`: clean solve → 1d, then 3d, then interval × ease (cap 180d); grind solve (any failed tries since the last review) → ease −0.2 (floor 1.3), progress reset, back in 1d. Scheduling advances **only on the solve attempt** — wrong tries count as lapses for that solve, they don't reschedule by themselves.
@@ -91,7 +93,7 @@
 
 **Verification done:** 14 SRS unit tests + 5 plan-generation tests (resurfacing selection, caps, dedupe re-link preserves SRS state); 284 tests + lint + typecheck + web build green; migration deployed to Supabase; live smoke script (`apps/worker/scripts/srsSmoke.ts`, cleans up after itself): new drill due immediately → clean solve +1d → grind solve ease 2.3/reset → re-learn → second clean +3d, dueAt/lastReviewedAt persisted, selector filters by theme/excludes linked.
 
-## 2.4 — Accountability loop *(DONE 2026-09)*
+## 2.4 — Accountability loop _(DONE 2026-09)_
 
 1. **Schema** ✅ — migration `0000000000009_accountability`: `Streak` (one per user; current/longest streak, `lastCheckInWeekStart`, `lastNudgeWeekStart` for nudge idempotency), `CheckIn` (unique per user+weekStart, Monday 00:00 UTC — same week math as plans), `RatingSnapshot` (unique per user+source+perf+ratedAt → idempotent writes; index for chart reads).
 2. **Streak math** ✅ — `core/src/accountability.ts`: same-week check-in is a no-op; previous week extends; any longer gap resets to 1. `isNudgeDue` decides nudges purely from state.
@@ -103,7 +105,7 @@
 
 > **Operational note:** the nudge scan is global by design — never run `sendWeeklyNudges` against the shared dev/prod DB manually (an early smoke did and marked 15 real users as nudged; reverted via SQL before any real email could go out — the smoke now checks candidacy without sending).
 
-## 2.5 — Payments stubs/hooks only *(port shipped in 2.0; gateway deferred)*
+## 2.5 — Payments stubs/hooks only _(port shipped in 2.0; gateway deferred)_
 
 - **Built:** `Billing` port in `packages/core` (`getEntitlement` → `{ tier, canUseCoaching }`), `MockBilling` adapter + `createBilling` factory + `BILLING_PROVIDER=mock` env, singleton wired into `apps/web/lib/server.ts`. **No gateway SDK, no checkout, no webhooks.**
 - **Deferred (future plan file):** actual gateway integration (Stripe or alternative), subscription sync, billing portal, real `/pricing` page. The `Billing` port makes the choice a pure adapter task.
