@@ -1,7 +1,7 @@
 # Chess Coach — MVP
 
 A personal chess coach. Turns a user's own Lichess games into a clear, personal
-**weakness report**. This is a demand-validation MVP (see `chess-coach-spec.md`).
+**weakness report**. This is a demand-validation MVP (see `plans/chess-coach-spec.md`).
 
 ## What it does
 

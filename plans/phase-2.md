@@ -1,6 +1,6 @@
 # Phase 2 Plan — The Core Coaching Product
 
-*Owner: Shishir · Status: approved 2026-09 · Builds on the shipped MVP (see `chess-coach-spec.md` §14, now complete)*
+*Owner: Shishir · Status: approved 2026-09 · Builds on the shipped MVP (see `chess-coach-spec.md` §14 in this directory, now complete)*
 
 > Going forward, each phase gets its own plan file in `plans/` (e.g. `plans/phase-3.md`). This file is the source of truth for Phase 2; the spec remains the source of truth for MVP scope and architecture principles (§0, §5.2, §8, §11.6).
 

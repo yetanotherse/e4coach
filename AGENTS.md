@@ -10,7 +10,7 @@ The MVP shipped (spec phases A–E complete). The project is now in **Phase 2** 
 
 ## Source-of-truth documents (read when scope/architecture matters)
 
-- `chess-coach-spec.md` — product & engineering spec; MVP scope, architecture principles (§5.2, §8), non-functional requirements (§11). MVP build (§14) is **complete**; do not treat §14 as pending work.
+- `plans/chess-coach-spec.md` — product & engineering spec; MVP scope, architecture principles (§5.2, §8), non-functional requirements (§11). MVP build (§14) is **complete**; do not treat §14 as pending work.
 - `plans/phase-2.md` — Phase 2 plan with locked decisions (D-P2-#). Active phases get their own file in `plans/`.
 - `README.md` — setup, env vars, deployment notes.
 - `DEPLOY.md` — deployment (Vercel web, Render/Fly worker, Supabase Postgres).
